@@ -1,15 +1,20 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-import io
-import urllib.parse
 import re
 
+# --- 1. CLEAN DATA (Step 3: MSEDCL 2026 Ground Truth) ---
+TARIFF_SLABS = [(100, 4.63), (300, 11.75), (500, 16.23), (float('inf'), 18.63)]
+FIXED_CHARGE = 115.0
+TAX_MULTIPLIER = 1.16  # 16% Electricity Duty
+COST_PER_KW = 65000     # Nashik 2026 Standard
+SUBSIDY_3KW = 78000
+
 # --- UI SETUP ---
-st.set_page_config(page_title="AutoScan AI", page_icon="🚗", layout="centered")
-st.title("🚗 AutoScan AI")
-st.markdown("### 🔍 Precision Part-by-Part Audit")
-st.caption("2026 Nashik Estimates • Individual Part Verification")
+st.set_page_config(page_title="SolarOptima Nashik", page_icon="☀️", layout="centered")
+st.title("☀️ SolarOptima Nashik")
+st.markdown("### VJTI-Engineered ROI Calculator")
+st.caption("Grounded in 2026 MSEDCL Tariffs & PM-Surya Ghar Subsidies")
 
 # --- AUTHENTICATION ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -19,104 +24,68 @@ else:
 
 if api_key:
     genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+
+    # --- 2. INPUT SECTION ---
+    uploaded_bill = st.file_uploader("📸 Upload your MSEDCL Bill (Photo)", type=["jpg", "jpeg", "png"])
     
-    # --- AUTO-MODEL DISCOVERY ---
-    try:
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        flash_model = next((m for m in available_models if 'flash' in m), "gemini-1.5-flash")
-        model = genai.GenerativeModel(flash_model)
-    except Exception as e:
-        st.error(f"Environment Error: {e}")
-        st.stop()
+    if uploaded_bill:
+        img = Image.open(uploaded_bill)
+        st.image(img, caption="MSEDCL Bill Detected", use_container_width=True)
 
-    # --- INPUT SECTION ---
-    uploaded_file = st.file_uploader("Upload damage photo", type=["jpg", "jpeg", "png"])
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        premium = st.number_input("Annual Premium (₹)", value=22000, step=500)
-    with col2:
-        ncb = st.slider("NCB %", 0, 50, 25, step=5)
-
-    if uploaded_file:
-        img = Image.open(uploaded_file)
-        st.image(img, caption="Scanning for specific components...", use_container_width=True)
-
-        if st.button("RUN GRANULAR AUDIT"):
-            with st.spinner("Identifying individual parts..."):
-                # ADVANCED PROMPT FOR LINE-ITEM EXTRACTION
-                prompt = f"""
-                Act as a Precision Auto Surveyor. Analyze the car in the photo.
-                1. Identify the Car Model.
-                2. List EVERY damaged component that needs replacement.
-                3. For each part, estimate the 2026 MGP (Maruti Genuine Part) price.
-                
-                OUTPUT FORMAT:
-                VEHICLE: [Car Name]
-                
-                PART_LIST:
-                - [Part Name 1] | ₹[Price 1]
-                - [Part Name 2] | ₹[Price 2]
-                
-                LABOR: ₹[Total Painting/Fitting]
-                
-                VERDICT: [GO FOR CLAIM / GO FOR CASH] (Based on {premium} Premium and {ncb}% NCB)
-                """
-                
+        if st.button("🚀 CALCULATE ROI"):
+            with st.spinner("Step 4: Running Vision & Financial Algorithm..."):
+                # VISION LOGIC
+                prompt = "Analyze this MSEDCL bill. Find the 'Total Units Consumed' or 'Current Consumption'. Just output the number."
                 try:
                     response = model.generate_content([prompt, img])
-                    res_text = response.text
+                    units = float(re.search(r'\d+', response.text).group())
                     
-                    # --- PARSING THE DATA ---
-                    st.markdown("---")
+                    # --- STEP 4: THE ALGORITHM ---
+                    # A. Sizing
+                    suggested_kw = round((units / 120) * 2) / 2
+                    suggested_kw = max(1.0, min(suggested_kw, 10.0))
                     
-                    # Extract Vehicle Name
-                    vehicle_match = re.search(r"VEHICLE:\s*(.*)", res_text)
-                    vehicle_name = vehicle_match.group(1) if vehicle_match else "Maruti"
-                    
-                    st.subheader(f"📊 Repair Estimate: {vehicle_name}")
-                    
-                    # Extract Parts and Create Granular Table
-                    parts_data = []
-                    total_parts_cost = 0
-                    
-                    # Regex to find the part list lines
-                    parts_lines = re.findall(r"-\s*(.*?)\s*\|\s*₹([\d,]+)", res_text)
-                    
-                    for part_name, part_price in parts_lines:
-                        price_val = int(part_price.replace(',', ''))
-                        total_parts_cost += price_val
-                        
-                        # Create a Deep Link for this specific part
-                        search_q = f"{vehicle_name} {part_name} genuine price"
-                        encoded_q = urllib.parse.quote(search_q)
-                        verify_url = f"https://boodmo.com/search/{encoded_q}/"
-                        
-                        parts_data.append({
-                            "Component": part_name,
-                            "Est. Price": f"₹{part_price}",
-                            "Action": verify_url
-                        })
+                    # B. Billing Math (Current vs After Solar)
+                    def get_bill(u):
+                        if u <= 100: e = u * 4.63
+                        elif u <= 300: e = (100 * 4.63) + (u-100) * 11.75
+                        else: e = (100 * 4.63) + (200 * 11.75) + (u-300) * 16.23
+                        return (e + FIXED_CHARGE) * TAX_MULTIPLIER
 
-                    # Displaying the Granular Table with Links
-                    if parts_data:
-                        for item in parts_data:
-                            c1, c2, c3 = st.columns([2, 1, 1.5])
-                            c1.write(f"**{item['Component']}**")
-                            c2.write(item['Est. Price'])
-                            c3.link_button("🔗 Verify Price", item['Action'])
-                            st.divider()
+                    current_bill = get_bill(units)
+                    solar_gen = suggested_kw * 120
+                    remaining_u = max(0, units - solar_gen)
+                    new_bill = get_bill(remaining_u)
                     
-                    # Display the Rest of the Report
-                    st.markdown(res_text.split("PART_LIST:")[0]) # Show vehicle info
+                    monthly_savings = current_bill - new_bill
                     
-                    # Final Verdict Section
-                    verdict_match = re.search(r"VERDICT:\s*(.*)", res_text)
-                    if verdict_match:
-                        st.info(f"💡 **AI Recommendation:** {verdict_match.group(1)}")
+                    # C. Investment Math
+                    gross = suggested_kw * COST_PER_KW
+                    subsidy = SUBSIDY_3KW if suggested_kw >= 3 else (suggested_kw * 30000)
+                    net_cost = gross - subsidy
+                    payback_yrs = net_investment = net_cost / (monthly_savings * 12)
+
+                    # --- 3. OUTPUT REPORT ---
+                    st.divider()
+                    st.success(f"✅ Extracted Consumption: **{units} Units/Month**")
+                    
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("System Size", f"{suggested_kw} kW")
+                    c2.metric("Net Investment", f"₹{int(net_cost):,}")
+                    c3.metric("Payback", f"{payback_yrs:.1f} Years")
+
+                    st.info(f"💰 **Monthly Savings:** ₹{int(monthly_savings):,} (Including 16% Duty)")
+                    
+                    # --- STEP 6: FEEDBACK LOOP ---
+                    st.markdown("---")
+                    st.subheader("🏁 Step 6: Feedback for Enhancement")
+                    correct = st.radio("Was the unit extraction accurate?", ("Yes", "No"))
+                    if correct == "No":
+                        real_units = st.number_input("What were the actual units on the bill?", value=units)
+                        st.write("Thanks! This data will help us tune our OCR algorithm.")
 
                 except Exception as e:
-                    st.error(f"Surveyor Error: {e}")
-                    st.write("Ensure your photo clearly shows the damaged panels.")
+                    st.error(f"Processing Error: {e}")
 else:
-    st.warning("Please enter your API Key in the sidebar.")
+    st.warning("Please provide your API Key in the sidebar.")
