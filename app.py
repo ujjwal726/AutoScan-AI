@@ -17,7 +17,7 @@ SUBSIDY_3KW = 78000
 st.set_page_config(page_title="SolarOptima Nashik", page_icon="☀️", layout="centered")
 st.title("☀️ SolarOptima Nashik")
 st.markdown("### ⚡ Precision Solar ROI Calculator")
-st.caption("Grounded in 2026 MSEDCL Tariffs • VJTI Electrical Engineering Logic")
+st.caption("Grounded in 2026 MSEDCL Tariffs)
 
 # --- 2. INPUT SECTION ---
 with st.container(border=True):
@@ -82,4 +82,4 @@ if st.button("🚀 CALCULATE ROI", use_container_width=True, type="primary"):
 
 # --- STEP 6: FEEDBACK LOOP ---
 st.markdown("---")
-st.caption("💬 Feedback: Does this match your actual bill? If the rates have changed, let us know to update the Step 3 dataset.")
+st.caption("💬 Feedback: Does this match your actual bill? If the rates have changed, let us know to update dataset")
