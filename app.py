@@ -2,12 +2,13 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 import io
+import urllib.parse
 
 # --- UI SETUP ---
 st.set_page_config(page_title="AutoScan AI", page_icon="🚗", layout="centered")
 st.title("🚗 AutoScan AI")
-st.markdown("### ⚡ Fast Damage & Insurance Verdict")
-st.caption("AI-Powered Surveyor • 2026 Nashik Rates • Genuine Parts")
+st.markdown("### ⚡ Instant Damage & Insurance Verdict")
+st.caption("AI-Powered Surveyor • 2026 Nashik Rates • Live Part Validation")
 
 # --- AUTHENTICATION ---
 if "GEMINI_API_KEY" in st.secrets:
@@ -38,49 +39,61 @@ if api_key:
 
     if uploaded_file:
         img = Image.open(uploaded_file)
-        st.image(img, caption="Damage Analysis in Progress...", use_container_width=True)
+        st.image(img, caption="Analyzing Damage...", use_container_width=True)
 
         if st.button("GET VERDICT"):
-            with st.spinner("Calculating Financial Impact..."):
-                # CRISP & AUTHORITATIVE PROMPT
+            with st.spinner("Analyzing Part Prices & Insurance..."):
+                # PROMPT DESIGNED FOR DYNAMIC LINK EXTRACTION
                 prompt = f"""
                 Act as a Precise Auto Surveyor. Analyze this photo.
-                Output ONLY this structure:
+                Output exactly in this JSON-style structure (but in Markdown):
                 
                 ### 🛠️ Damage Summary
                 - **Vehicle:** [Model Name]
+                - **Part Identified:** [Specific Part Name]
                 - **Severity:** [Low/Med/High]
-                - **Primary Damage:** [1-sentence description]
 
-                ### 📊 Cost Breakdown (2026 Nashik Rates)
-                | Component | Estimated Cost (INR) |
+                ### 📊 Cost Breakdown (Nashik 2026)
+                | Component | Cost (INR) |
                 | :--- | :--- |
-                | Genuine Spare Part | [Cost] |
-                | Painting & Finishing | [Cost] |
-                | Fitting/Labor | [Cost] |
+                | Spare Part (MGP) | ₹[Cost] |
+                | Paint & Labor | ₹[Cost] |
                 | **Total Out-of-Pocket** | **₹[Sum]** |
 
                 ### ⚖️ Insurance Math
-                - **Claim Value:** ₹[Total - 1000 deductible]
-                - **NCB Loss:** ₹{premium * (ncb/100)} (Next year's premium hike)
+                - **Claim Value:** ₹[Total - 1000]
+                - **NCB Loss:** ₹{premium * (ncb/100)}
 
                 # FINAL VERDICT: [GO FOR CLAIM / GO FOR CASH]
                 """
                 
                 try:
                     response = model.generate_content([prompt, img])
+                    output_text = response.text
                     
+                    # --- DISPLAY REPORT ---
                     st.markdown("---")
-                    st.markdown(response.text)
+                    st.markdown(output_text)
+
+                    # --- DYNAMIC DEEP LINK GENERATION ---
+                    # We extract the car and part names to create a direct search link
+                    st.subheader("🔗 Verify This Price")
                     
-                    # --- AUTHORITY VALIDATION SECTION ---
-                    st.markdown("### 🔗 Validate These Rates")
-                    st.info("Check official 2026 prices for your specific variant:")
-                    v_col1, v_col2 = st.columns(2)
-                    with v_col1:
-                        st.link_button("Official Maruti Parts", "https://www.marutisuzuki.com/genuine-parts")
-                    with v_col2:
-                        st.link_button("Boodmo Live Catalog", "https://boodmo.com/vehicles/maruti-286/")
+                    # AI might provide different text, so we'll look for keywords
+                    # This is a simplified logic for our MVP
+                    search_query = f"Maruti Suzuki Genuine Parts"
+                    if "Vehicle:" in output_text and "Part Identified:" in output_text:
+                        # Extracting info for the link
+                        lines = output_text.split('\n')
+                        car = next((line.split('**Vehicle:**')[1].strip() for line in lines if '**Vehicle:**' in line), "Maruti")
+                        part = next((line.split('**Part Identified:**')[1].strip() for line in lines if '**Part Identified:**' in line), "Bumper")
+                        search_query = f"{car} {part} genuine price"
+
+                    encoded_query = urllib.parse.quote(search_query)
+                    boodmo_url = f"https://boodmo.com/search/{encoded_query}/"
+                    
+                    st.info(f"The AI detected a **{search_query}**. Validate the current market price below:")
+                    st.link_button(f"👉 Check Price for {part}", boodmo_url)
                     
                 except Exception as e:
                     st.error(f"Analysis Error: {e}")
