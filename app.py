@@ -1,7 +1,7 @@
 import streamlit as st
 
-# --- 1. CLEAN DATA (Step 3: MSEDCL 2026 Ground Truth) ---
-# Rates derived from Ujjwal's MSEDCL Bill images
+# --- 1. CLEAN DATA (MSEDCL 2026 Ground Truth) ---
+# Rates derived from your MSEDCL Bill images
 TARIFF_SLABS = [
     (100, 4.63),   # 0-100 units
     (300, 11.75),  # 101-300 units
@@ -17,7 +17,7 @@ SUBSIDY_3KW = 78000
 st.set_page_config(page_title="SolarOptima Nashik", page_icon="☀️", layout="centered")
 st.title("☀️ SolarOptima Nashik")
 st.markdown("### ⚡ Precision Solar ROI Calculator")
-st.caption("Grounded in 2026 MSEDCL Tariffs)
+st.caption("Grounded in 2026 MSEDCL Tariffs")
 
 # --- 2. INPUT SECTION ---
 with st.container(border=True):
@@ -53,7 +53,6 @@ if st.button("🚀 CALCULATE ROI", use_container_width=True, type="primary"):
     
     # C. Investment Math (PM Surya Ghar 2026)
     gross_investment = suggested_kw * COST_PER_KW
-    # Subsidy Logic: 30k/kW for first 2kW, 18k for 3rd kW, Capped at 78k
     if suggested_kw >= 3:
         subsidy = SUBSIDY_3KW
     else:
@@ -80,6 +79,6 @@ if st.button("🚀 CALCULATE ROI", use_container_width=True, type="primary"):
     
     st.balloons()
 
-# --- STEP 6: FEEDBACK LOOP ---
+# --- FOOTER ---
 st.markdown("---")
-st.caption("💬 Feedback: Does this match your actual bill? If the rates have changed, let us know to update dataset")
+st.caption("💬 Does this match your actual bill? We use the latest available tariff data for Nashik.")
