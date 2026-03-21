@@ -3,25 +3,23 @@ import google.generativeai as genai
 from PIL import Image
 import urllib.parse
 import re
+import time
 
-# --- 1. THE "GROUND TRUTH" DATASET (2026 Maruti Genuine Parts) ---
-# Prices for Grand Vitara / Brezza Class
+# --- 1. DATASET (2026 MGP) ---
 PARTS_DATABASE = {
-    "BONNET": {"replace": 22163, "repair": 5500, "label": "Bonnet/Hood Assembly"},
-    "FRONT BUMPER": {"replace": 12325, "repair": 3500, "label": "Front Bumper Shell"},
-    "REAR BUMPER": {"replace": 10396, "repair": 3200, "label": "Rear Bumper Shell"},
-    "HEADLIGHT (LED)": {"replace": 11152, "repair": 1500, "label": "LED Headlight Assy"},
-    "FENDER": {"replace": 8335, "repair": 4000, "label": "Front Fender Panel"},
-    "DOOR": {"replace": 14665, "repair": 4500, "label": "Door Shell"},
-    "WINDSHIELD": {"replace": 18564, "repair": 0, "label": "Front Windshield Glass"}
+    "BONNET": {"replace": 22163, "repair": 5500},
+    "FRONT BUMPER": {"replace": 12325, "repair": 3500},
+    "REAR BUMPER": {"replace": 10396, "repair": 3200},
+    "HEADLIGHT (LED)": {"replace": 11152, "repair": 1500},
+    "FENDER": {"replace": 8335, "repair": 4000},
+    "DOOR": {"replace": 14665, "repair": 4500},
+    "WINDSHIELD": {"replace": 18564, "repair": 0}
 }
 
-# --- UI SETUP ---
 st.set_page_config(page_title="AutoScan AI", page_icon="🚗", layout="wide")
 st.title("🚗 AutoScan Insurance AI")
-st.markdown("### 📋 Precision Damage Audit & Claim Strategy")
+st.caption("Running on High-Quota 1.5-Flash-8B Engine")
 
-# --- AUTHENTICATION & MODEL FIX ---
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
@@ -29,17 +27,15 @@ else:
 
 if api_key:
     genai.configure(api_key=api_key)
-    # UPDATED: Using Gemini 2.0 Flash to avoid the 404 error
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    # SWITCHED MODEL: gemini-1.5-flash-8b has higher free-tier limits
+    model = genai.GenerativeModel("gemini-1.5-flash-8b")
 
-    # --- 2. POLICY INPUTS ---
     with st.sidebar:
         st.header("🛡️ Policy Context")
         premium = st.number_input("Annual Premium (₹)", value=22000)
         ncb_pct = st.slider("Current NCB %", 0, 50, 25)
-        file_charge = 1000 # Standard MSEDCL/Insurance file charge
-        potential_loss = ((premium * ncb_pct) / 100) + file_charge
-        st.error(f"Financial Loss on Claim: ₹{int(potential_loss):,}")
+        potential_loss = ((premium * ncb_pct) / 100) + 1000
+        st.error(f"Loss on Claim: ₹{int(potential_loss):,}")
 
     uploaded_file = st.file_uploader("Upload Damage Photo", type=["jpg", "jpeg", "png"])
 
@@ -47,68 +43,55 @@ if api_key:
         img = Image.open(uploaded_file)
         st.image(img, use_container_width=True)
 
-        if st.button("🚀 ANALYZE REPAIR VS CLAIM"):
-            with st.spinner("Surveying parts and calculating ROI..."):
-                prompt = f"""
-                Act as a Professional Insurance Surveyor. Use this dataset: {PARTS_DATABASE}
-                Analyze the image for a Maruti car.
-                1. Identify the car model.
-                2. List parts that are CLEARLY damaged.
-                3. Choose 'REPLACE' for cracks/holes or 'REPAIR' for dents.
-                4. Match the EXACT price from the provided dataset.
-
-                OUTPUT FORMAT:
-                VEHICLE: [Model Name]
-                DAMAGED_PARTS:
-                - [Part Name] | ₹[Price] | [Action]
-                SEVERITY: [One sentence on structural impact]
-                """
-                
+        if st.button("🚀 ANALYZE DAMAGE"):
+            # Robust Retry Logic
+            max_retries = 3
+            success = False
+            
+            for attempt in range(max_retries):
                 try:
-                    response = model.generate_content([prompt, img])
-                    res_text = response.text
-                    
-                    st.markdown("---")
-                    # Extraction Logic
-                    vehicle_match = re.search(r"VEHICLE:\s*(.*)", res_text)
-                    vehicle = vehicle_match.group(1) if vehicle_match else "Maruti"
-                    
+                    with st.spinner(f"Analyzing... (Attempt {attempt + 1})"):
+                        prompt = f"Identify Maruti model and damaged parts from this image. Use this exact pricing: {PARTS_DATABASE}. Format output strictly as: VEHICLE: [Model], DAMAGED_PARTS: - [Part Name] | ₹[Price] | [Action]"
+                        response = model.generate_content([prompt, img])
+                        res_text = response.text
+                        success = True
+                        break
+                except Exception as e:
+                    if "429" in str(e):
+                        time.sleep(3)
+                    else:
+                        st.error(f"Error: {e}")
+                        break
+            
+            if success:
+                st.markdown("---")
+                # Parse and Display (Same logic as before)
+                try:
+                    vehicle = re.search(r"VEHICLE:\s*(.*)", res_text).group(1)
                     st.subheader(f"📑 Audit: {vehicle}")
                     
-                    # Layout for the parts table
                     parts_lines = re.findall(r"-\s*(.*?)\s*\|\s*₹([\d,]+)", res_text)
                     total_repair = 0
                     
-                    col1, col2, col3 = st.columns([2, 1, 1])
-                    col1.write("**Component**")
-                    col2.write("**2026 MGP Rate**")
-                    col3.write("**Action**")
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    c1.write("**Component**"); c2.write("**2026 MGP Rate**"); c3.write("**Action**")
                     st.divider()
 
                     for name, price in parts_lines:
-                        price_val = int(price.replace(',', ''))
-                        total_repair += price_val
-                        
-                        c1, c2, c3 = st.columns([2, 1, 1])
-                        c1.write(f"**{name}**")
-                        c2.write(f"₹{price}")
-                        # Part-specific verification link
-                        q = urllib.parse.quote(f"Maruti {vehicle} {name} price 2026")
-                        c3.link_button("🔗 Check Live Rates", f"https://boodmo.com/search/{q}/")
+                        p_val = int(price.replace(',', ''))
+                        total_repair += p_val
+                        col1, col2, col3 = st.columns([2, 1, 1])
+                        col1.write(f"**{name}**")
+                        col2.write(f"₹{price}")
+                        q = urllib.parse.quote(f"Maruti {vehicle} {name} price")
+                        col3.link_button("🔗 Verify", f"https://boodmo.com/search/{q}/")
                         st.divider()
 
-                    # --- 3. THE "PM" DECISION ENGINE ---
-                    st.subheader("💡 Strategic Suggestion")
-                    
-                    # Logic: Is Total Repair > (NCB Loss + File Charge)?
                     if total_repair > potential_loss:
-                        st.success(f"🎯 **SUGGESTION: GO FOR CLAIM**")
-                        st.write(f"Repairing out-of-pocket (₹{total_repair:,}) is more expensive than losing your NCB benefit (₹{int(potential_loss):,}).")
+                        st.success(f"🎯 **SUGGESTION: GO FOR CLAIM** (Repair ₹{total_repair:,} > Loss ₹{int(potential_loss):,})")
                     else:
-                        st.warning(f"🎯 **SUGGESTION: PAY CASH**")
-                        st.write(f"Your NCB loss (₹{int(potential_loss):,}) is higher than the repair cost (₹{total_repair:,}). Paying cash protects your future premium discount.")
-
-                except Exception as e:
-                    st.error(f"Algorithm Error: {e}. Ensure Generative Language API is enabled.")
+                        st.warning(f"🎯 **SUGGESTION: PAY CASH** (Protect your NCB)")
+                except:
+                    st.error("Format error. Please try a clearer photo.")
 else:
-    st.warning("Please enter your API Key to proceed.")
+    st.warning("Please enter your API Key.")
