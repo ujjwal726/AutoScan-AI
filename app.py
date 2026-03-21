@@ -8,13 +8,25 @@ st.set_page_config(page_title="AutoScan AI", page_icon="🚗")
 st.title("🚗 AutoScan AI")
 st.markdown("### 60-Second Car Damage & Insurance Consultant")
 
-# --- AUTHENTICATION ---
-# In a real app, we use 'Secrets', but for now, we'll use a Sidebar input
-api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
+# --- AUTHENTICATION (The "Secret" Way) ---
+# This looks for the key in Streamlit Cloud Secrets first
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    # This allows you to still use a sidebar if the secret isn't set yet
+    api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
 
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    # --- AUTO-MODEL DISCOVERY (This fixes your error!) ---
+    try:
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        flash_model = next((m for m in available_models if 'flash' in m), "gemini-1.5-flash")
+        model = genai.GenerativeModel(flash_model)
+    except Exception as e:
+        st.error(f"Connection Error: {e}")
+        st.stop()
 
     # --- INPUT SECTION ---
     uploaded_file = st.file_uploader("Upload a photo of the damage", type=["jpg", "jpeg", "png"])
@@ -31,7 +43,6 @@ if api_key:
 
         if st.button("Analyze & Advise"):
             with st.spinner("AI Surveyor is calculating..."):
-                # Combining your 5-Cell Logic into one Prompt
                 prompt = f"""
                 Analyze this car damage for the Indian market.
                 1. Identify Car Model and Damage Severity.
@@ -39,9 +50,11 @@ if api_key:
                 3. Compare (Cost - 1000) vs NCB Loss of ₹{premium * (ncb/100)}.
                 4. Give a Bold Recommendation: 'GO FOR CLAIM' or 'GO FOR CASH'.
                 """
-                response = model.generate_content([prompt, img])
-                
-                st.subheader("📋 Final Verdict")
-                st.write(response.text)
+                try:
+                    response = model.generate_content([prompt, img])
+                    st.subheader("📋 Final Verdict")
+                    st.write(response.text)
+                except Exception as e:
+                    st.error(f"Analysis Failed: {e}")
 else:
-    st.info("Please enter your Gemini API Key in the sidebar to start.")
+    st.info("Waiting for API Key. Add it to 'Secrets' in Streamlit settings or enter it in the sidebar.")
