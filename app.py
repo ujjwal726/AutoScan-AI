@@ -48,16 +48,19 @@ tab1, tab2, tab3 = st.tabs(["📸 1. Secure Ledger Upload", "🧠 2. The Wealth 
 with tab1:
     st.header("Step 1: Digitize Your Paper Ledger")
     
-    st.error("🔒 **ZERO-TRUST PROTOCOL:** Do NOT upload official bank statements or screenshots of your banking apps.")
+    st.error("🔒 **ZERO-TRUST PROTOCOL:** Do NOT upload official bank statements or screenshots of your banking apps. We do not want your personal data.")
     
-    st.write("To guarantee absolute privacy, write your expenses on paper and upload a photo. Our Vision AI will digitize it instantly.")
+    st.write("To guarantee your absolute privacy, please write your expenses on a physical piece of paper and upload a photo of it. Our Vision AI will digitize it instantly.")
     
     with st.container(border=True):
         st.markdown("""
-        **📝 Format Example:**
-        * 12-March | Zomato (Burger) | 450
-        * 14-March | Amazon Jacket | 8500
-        * 15-March | Salary | 50000
+        **📝 How to format your paper ledger:**
+        Keep it simple. Write the Date, Description, and Amount. No names, no personal IDs.
+        
+        *Example:*
+        * **12-March | Zomato (Burger) | 450**
+        * **14-March | Amazon Jacket | 1200**
+        * **15-March | Salary | 50000**
         """)
         
     st.divider()
@@ -75,7 +78,7 @@ with tab1:
                     Extract the transactions from this handwritten image. 
                     Output strictly as a valid CSV with three columns: Date, Description, Amount.
                     Do not use commas inside the text fields. Ensure amounts are purely numbers.
-                    Do not include markdown. Just raw text.
+                    Do not include any markdown formatting like ```csv. Just the raw text.
                     """
                     response = model.generate_content([vision_prompt, image])
                     clean_csv_text = response.text.replace("```csv\n", "").replace("```", "").strip()
@@ -90,10 +93,10 @@ with tab1:
                     df_vision.to_csv(csv_buffer, index=False)
                     st.download_button("⬇️ Download Clean CSV for Step 2", data=csv_buffer.getvalue(), file_name="secure_expenses.csv", mime="text/csv")
                 except Exception as e:
-                    st.error(f"Error reading image: Please ensure handwriting is clear. ({e})")
+                    st.error(f"Error reading image: Please ensure your handwriting is clear and try again. ({e})")
 
 # ==========================================
-# TAB 2: THE WEALTH ENGINE (V1.6 AI AUTO-TAG & PRAISE)
+# TAB 2: THE WEALTH ENGINE (CRASH-PROOF V1.6.1)
 # ==========================================
 with tab2:
     st.header("Step 2: Tag & Analyze")
@@ -101,11 +104,13 @@ with tab2:
     clean_file = st.file_uploader("Upload Digitized Data (CSV)", type=["csv"], key="clean_upload")
     
     if clean_file:
-        # --- SMART PRE-PROCESSING: AUTO-TAGGING ---
-        # We use session state so the AI only auto-tags once per file upload
-        if "current_file" not in st.session_state or st.session_state.current_file != clean_file.name:
+        # --- SMART PRE-PROCESSING: CRASH-PROOF AUTO-TAGGING ---
+        if "last_processed_file" not in st.session_state or st.session_state.last_processed_file != clean_file.name:
             df = pd.read_csv(clean_file)
             
+            if 'Tag' not in df.columns:
+                df['Tag'] = "Uncategorized"
+                
             if model and "Description" in df.columns:
                 with st.spinner("✨ AI is pre-reading your transactions and auto-tagging them..."):
                     try:
@@ -113,7 +118,7 @@ with tab2:
                         tag_prompt = f"""
                         Categorize these transactions into exactly one of these 4 tags: Need, Desire, Salary, Income.
                         Transactions: {desc_list}
-                        Return ONLY a comma-separated list of tags in the exact order. No extra text.
+                        Return ONLY a comma-separated list of tags in the exact order. No extra text or markdown.
                         """
                         tag_response = model.generate_content(tag_prompt)
                         tags = [t.strip().strip("'").strip('"') for t in tag_response.text.split(',')]
@@ -121,18 +126,20 @@ with tab2:
                         if len(tags) == len(df):
                             df['Tag'] = tags
                     except Exception:
-                        pass # If AI fails, it leaves them as "Uncategorized"
+                        pass # Silently fail back to Uncategorized if AI formats incorrectly
             
-            st.session_state.working_df = df
-            st.session_state.current_file = clean_file.name
+            # Save to memory so it doesn't loop
+            st.session_state.auto_tagged_df = df
+            st.session_state.last_processed_file = clean_file.name
 
         # --- THE INTERACTIVE EDITOR ---
         st.subheader("1. Financial Triage")
-        st.info("💡 **Agency Check:** The AI has auto-tagged your transactions to save you time. Please review them. Double-click any tag to manually override it.")
+        st.info("💡 **Agency Check:** The AI has auto-tagged your transactions. Please review them. Double-click any tag to manually override it.")
         
-        # We load the dataframe from session state so manual edits don't get erased
+        # We pass a key to ensure manual edits survive button clicks
         edited_df = st.data_editor(
-            st.session_state.working_df,
+            st.session_state.auto_tagged_df,
+            key="expense_editor",
             column_config={
                 "Tag": st.column_config.SelectboxColumn(
                     "Tag", 
@@ -142,9 +149,6 @@ with tab2:
             },
             use_container_width=True
         )
-        
-        # Update session state with manual edits
-        st.session_state.working_df = edited_df
         
         if "Amount" in edited_df.columns:
             edited_df['Amount'] = pd.to_numeric(edited_df['Amount'], errors='coerce').fillna(0)
