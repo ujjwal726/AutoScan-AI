@@ -1,84 +1,156 @@
 import streamlit as st
+import pandas as pd
+import google.generativeai as genai
+import io
 
-# --- 1. CLEAN DATA (MSEDCL 2026 Ground Truth) ---
-# Rates derived from your MSEDCL Bill images
-TARIFF_SLABS = [
-    (100, 4.63),   # 0-100 units
-    (300, 11.75),  # 101-300 units
-    (500, 16.23),  # 301-500 units
-    (float('inf'), 18.63) # 500+ units
-]
-FIXED_CHARGE = 115.0
-TAX_MULTIPLIER = 1.16  # 16% Electricity Duty
-COST_PER_KW = 65000     # Nashik 2026 Average
-SUBSIDY_3KW = 78000
+# --- CONFIGURATION & SETUP ---
+st.set_page_config(page_title="WealthTrace AI", page_icon="📈", layout="wide")
+st.title("📈 WealthTrace AI")
+st.markdown("### Privacy-First Opportunity Cost & Wealth Engine")
 
-# --- UI SETUP ---
-st.set_page_config(page_title="SolarOptima Nashik", page_icon="☀️", layout="centered")
-st.title("☀️ SolarOptima Nashik")
-st.markdown("### ⚡ Precision Solar ROI Calculator")
-st.caption("Grounded in 2026 MSEDCL Tariffs")
+# --- AUTHENTICATION ---
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
 
-# --- 2. INPUT SECTION ---
-with st.container(border=True):
-    units = st.number_input("Average Monthly Consumption (Units)", min_value=1, value=350, step=10)
-    phase = st.selectbox("Connection Type", ["Single Phase", "Three Phase"])
-    st.info("💡 A 3-4kW system is usually optimal for 300-500 units in Nashik.")
+if api_key:
+    genai.configure(api_key=api_key)
+    # Using the fast, high-quota model
+    model = genai.GenerativeModel("gemini-1.5-flash-8b")
+else:
+    st.sidebar.warning("API Key required for the AI Strategy modules.")
 
-# --- 3. THE ANALYZE BUTTON ---
-if st.button("🚀 CALCULATE ROI", use_container_width=True, type="primary"):
+# --- NAVIGATION TABS ---
+tab1, tab2, tab3 = st.tabs(["🛡️ 1. Data Sanitizer", "🧠 2. The Wealth Engine", "🛑 3. Pre-Spend Interceptor"])
+
+# ==========================================
+# TAB 1: DATA SANITIZER (Steps 1, 2, 3)
+# ==========================================
+with tab1:
+    st.header("Step 1: Sanitize Your Bank Data")
+    st.write("Upload your raw bank CSV. We will process it locally to remove Personal Identifiable Information (PII) before any AI analysis.")
     
-    # --- STEP 4: THE ALGORITHM ---
-    # A. Sizing (1kW = 120 units/month in Nashik)
-    suggested_kw = round((units / 120) * 2) / 2
-    suggested_kw = max(1.0, min(suggested_kw, 10.0))
+    raw_file = st.file_uploader("Upload Raw Expenses (CSV)", type=["csv"], key="raw")
     
-    # B. Billing Math (Slab-Based Deduction)
-    def calculate_bill(u):
-        total_energy = 0
-        if u <= 100: total_energy = u * 4.63
-        elif u <= 300: total_energy = (100 * 4.63) + (u-100) * 11.75
-        elif u <= 500: total_energy = (100 * 4.63) + (200 * 11.75) + (u-300) * 16.23
-        else: total_energy = (100 * 4.63) + (200 * 11.75) + (200 * 16.23) + (u-500) * 18.63
+    if raw_file:
+        raw_df = pd.read_csv(raw_file)
+        st.write("Preview of Raw Data:")
+        st.dataframe(raw_df.head(3))
         
-        # Adding Fixed Charges + 16% Duty
-        return (total_energy + FIXED_CHARGE) * TAX_MULTIPLIER
-
-    current_monthly_bill = calculate_bill(units)
-    solar_generation = suggested_kw * 120
-    remaining_units = max(0, units - solar_generation)
-    new_monthly_bill = calculate_bill(remaining_units)
-    
-    monthly_savings = current_monthly_bill - new_monthly_bill
-    
-    # C. Investment Math (PM Surya Ghar 2026)
-    gross_investment = suggested_kw * COST_PER_KW
-    if suggested_kw >= 3:
-        subsidy = SUBSIDY_3KW
-    else:
-        subsidy = suggested_kw * 30000
+        # Select columns to KEEP (dropping Merchant, Account No, etc.)
+        st.info("Select ONLY the columns needed for financial math (e.g., Date, Amount, Generic Category).")
+        safe_cols = st.multiselect("Select columns to keep:", raw_df.columns.tolist())
         
-    net_investment = gross_investment - subsidy
-    payback_years = net_investment / (monthly_savings * 12)
+        if st.button("Sanitize & Download"):
+            if safe_cols:
+                clean_df = raw_df[safe_cols].copy()
+                # Add a blank column for tagging later
+                clean_df["Tag"] = "Uncategorized" 
+                
+                # Convert to CSV for download
+                csv_buffer = io.StringIO()
+                clean_df.to_csv(csv_buffer, index=False)
+                
+                st.success("Data sanitized! No personal info remains.")
+                st.download_button(
+                    label="⬇️ Download Cleaned Data",
+                    data=csv_buffer.getvalue(),
+                    file_name="clean_wealth_data.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.warning("Please select at least one column.")
 
-    # --- 4. OUTPUT DISPLAY ---
-    st.divider()
-    st.subheader("📋 Investment Summary")
+# ==========================================
+# TAB 2: THE WEALTH ENGINE (Steps 4, 5, 6, 7, 8, 9)
+# ==========================================
+with tab2:
+    st.header("Step 2: Tag & Analyze")
+    clean_file = st.file_uploader("Upload Cleaned Data (CSV)", type=["csv"], key="clean")
     
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Recommended Size", f"{suggested_kw} kW")
-    col2.metric("Net Cost", f"₹{int(net_investment):,}")
-    col3.metric("Payback Time", f"{payback_years:.1f} Yrs")
+    if clean_file:
+        df = pd.read_csv(clean_file)
+        
+        st.subheader("1. Triage Your Spending")
+        st.caption("Double-click the 'Tag' column to label transactions as Need or Desire.")
+        
+        # Interactive Data Editor for Tagging
+        edited_df = st.data_editor(
+            df,
+            column_config={
+                "Tag": st.column_config.SelectboxColumn(
+                    "Tag",
+                    help="Categorize this spend",
+                    options=["Need", "Desire", "Uncategorized"],
+                    required=True
+                )
+            },
+            use_container_width=True
+        )
+        
+        # Filter for Desires
+        desires_df = edited_df[edited_df["Tag"] == "Desire"]
+        total_desire_spend = desires_df["Amount"].sum() if "Amount" in desires_df.columns else 0
+        
+        st.divider()
+        st.subheader("2. Opportunity Cost Math")
+        # Formula: FV = PV * (1 + r)^n
+        rate = 0.12 # 12% expected market return
+        years = 10
+        future_value = total_desire_spend * ((1 + rate) ** years)
+        
+        col1, col2 = st.columns(2)
+        col1.metric("Total 'Desire' Spend", f"₹{total_desire_spend:,.2f}")
+        col2.metric(f"10-Year Opportunity Cost (12% CAGR)", f"₹{future_value:,.2f}", delta=f"+₹{future_value - total_desire_spend:,.2f}")
+        
+        st.divider()
+        st.subheader("3. AI Wealth Strategist")
+        st.write("Select a specific 'Desire' transaction to get 3 concrete investment alternatives.")
+        
+        if not desires_df.empty and api_key:
+            # Let user pick a transaction to deep dive
+            transaction_options = desires_df.apply(lambda row: f"₹{row['Amount']} on {row.get('Date', 'Unknown Date')}", axis=1).tolist()
+            selected_trans = st.selectbox("Select a transaction to analyze:", transaction_options)
+            
+            if st.button("Generate Alternatives"):
+                amount_match = float(selected_trans.split("₹")[1].split(" ")[0].replace(',', ''))
+                with st.spinner("Consulting AI Strategist..."):
+                    prompt = f"""
+                    A user spent ₹{amount_match} on a 'Desire' (non-essential item). 
+                    As a pragmatic financial advisor, provide 3 concrete, actionable investment or wealth-building alternatives for exactly ₹{amount_match} in India.
+                    Format as:
+                    1. [Alternative 1] - [Brief Reason]
+                    2. [Alternative 2] - [Brief Reason]
+                    3. [Alternative 3] - [Brief Reason]
+                    End with a 1-sentence macro recommendation.
+                    """
+                    response = model.generate_content(prompt)
+                    st.markdown(response.text)
 
-    with st.expander("🔍 View Financial Breakdown"):
-        st.write(f"**Current Monthly Bill:** ₹{int(current_monthly_bill):,}")
-        st.write(f"**Estimated New Bill:** ₹{int(new_monthly_bill):,}")
-        st.write(f"**Annual Savings:** ₹{int(monthly_savings * 12):,}")
-        st.write(f"**Total Subsidy:** ₹{int(subsidy):,}")
-        st.caption("Calculations include 16% Electricity Duty as per MSEDCL 2026 norms.")
+# ==========================================
+# TAB 3: THE INTERCEPTOR (Steps 10, 11)
+# ==========================================
+with tab3:
+    st.header("Step 3: The Pre-Spend Interceptor")
+    st.write("About to buy something online? Paste the details here before you check out.")
     
-    st.balloons()
-
-# --- FOOTER ---
-st.markdown("---")
-st.caption("💬 Does this match your actual bill? We use the latest available tariff data for Nashik.")
+    with st.container(border=True):
+        product_link = st.text_input("Product Link (Optional)")
+        item_name = st.text_input("What are you buying?")
+        item_price = st.number_input("Price (₹)", min_value=0, step=100)
+        
+        if st.button("Evaluate Purchase", type="primary") and api_key and item_price > 0:
+            # Math
+            interceptor_fv = item_price * ((1 + 0.12) ** 10)
+            
+            st.error(f"⚠️ **Wait!** That ₹{item_price:,.2f} today will cost you **₹{interceptor_fv:,.2f}** in 10 years.")
+            
+            with st.spinner("Finding better uses for this money..."):
+                prompt2 = f"""
+                A user is about to spend ₹{item_price} on '{item_name}'. 
+                Provide 2 concrete investment alternatives for this exact amount, and 1 psychological question to make them reconsider if they really need it.
+                """
+                response2 = model.generate_content(prompt2)
+                st.markdown("---")
+                st.markdown(response2.text)
