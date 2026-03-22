@@ -19,7 +19,7 @@ else:
 if api_key:
     genai.configure(api_key=api_key)
     # Using the standard 1.5-flash model as it handles both text and vision flawlessly
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash-latest")
 else:
     st.sidebar.warning("API Key required for the Vision Scanner (Tab 1) and Strategy modules (Tabs 2 & 3).")
 
