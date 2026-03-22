@@ -19,7 +19,6 @@ else:
 if api_key:
     genai.configure(api_key=api_key)
     try:
-        # Dynamically find the best available model
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
         if 'models/gemini-1.5-flash' in available_models:
@@ -59,9 +58,9 @@ with tab1:
         Keep it simple. Write the Date, Description, and Amount. No names, no UPI IDs.
         
         *Example:*
-        * **12-March | Zomato | 450**
+        * **12-March | Zomato (Burger) | 450**
         * **14-March | Amazon Jacket | 1200**
-        * **15-March | Petrol | 2000**
+        * **15-March | Salary | 50000**
         """)
         
     st.divider()
@@ -97,7 +96,7 @@ with tab1:
                     st.error(f"Error reading image: Please ensure your handwriting is clear and try again. ({e})")
 
 # ==========================================
-# TAB 2: THE WEALTH ENGINE
+# TAB 2: THE WEALTH ENGINE (V1.5 OVERHAUL)
 # ==========================================
 with tab2:
     st.header("Step 2: Tag & Analyze")
@@ -107,54 +106,84 @@ with tab2:
     if clean_file:
         df = pd.read_csv(clean_file)
         
-        st.subheader("1. Triage Your Spending")
-        st.caption("Double-click the 'Tag' column to honestly label your transactions as a Need or a Desire.")
+        st.subheader("1. Financial Triage")
+        st.info("💡 **Instructions:** Double-click the 'Tag' column to label your transactions. Use **Need** (essentials), **Desire** (wants/cravings), **Salary**, or **Income**.")
         
         edited_df = st.data_editor(
             df,
             column_config={
-                "Tag": st.column_config.SelectboxColumn("Tag", options=["Need", "Desire", "Uncategorized"], required=True)
+                "Tag": st.column_config.SelectboxColumn(
+                    "Tag", 
+                    options=["Need", "Desire", "Salary", "Income", "Uncategorized"], 
+                    required=True
+                )
             },
             use_container_width=True
         )
         
         if "Amount" in edited_df.columns:
             edited_df['Amount'] = pd.to_numeric(edited_df['Amount'], errors='coerce').fillna(0)
+            
+            # Filter Desires
             desires_df = edited_df[edited_df["Tag"] == "Desire"]
             total_desire_spend = desires_df["Amount"].sum()
             
             st.divider()
-            st.subheader("2. Opportunity Cost Math")
-            rate = 0.12 
-            years = 10
-            future_value = total_desire_spend * ((1 + rate) ** years)
+            st.subheader("2. The 'Desire' Leakage & 1-Year SIP Potential")
+            
+            # --- MATH: 1-Year SIP Calculation (Moderate Risk ~12% Annual) ---
+            # Assuming the uploaded ledger represents a typical month
+            monthly_rate = 0.12 / 12
+            months = 12
+            # Standard SIP FV Formula
+            sip_fv = total_desire_spend * (((1 + monthly_rate)**months - 1) / monthly_rate) * (1 + monthly_rate)
             
             col1, col2 = st.columns(2)
-            col1.metric("Total 'Desire' Spend", f"₹{total_desire_spend:,.2f}")
-            col2.metric("10-Year Opportunity Cost (12% CAGR)", f"₹{future_value:,.2f}", delta=f"+₹{future_value - total_desire_spend:,.2f}")
+            col1.metric("Total Monthly 'Desire' Spend", f"₹{total_desire_spend:,.2f}")
+            col2.metric("If Saved Monthly for 1 Year (12% SIP)", f"₹{sip_fv:,.2f}", delta=f"Wealth Created: +₹{sip_fv - (total_desire_spend * 12):,.2f}")
             
             st.divider()
-            st.subheader("3. AI Wealth Strategist")
+            st.subheader("3. Deep Behavioral Analysis")
             
-            if not desires_df.empty and model:
-                desc_col = 'Description' if 'Description' in desires_df.columns else desires_df.columns[1]
-                options = desires_df.apply(lambda row: f"₹{row['Amount']} on {row.get(desc_col, 'Item')}", axis=1).tolist()
-                selected_trans = st.selectbox("Select a 'Desire' transaction to analyze:", options)
-                
-                if st.button("Generate Investment Alternatives"):
-                    amount_match = float(selected_trans.split("₹")[1].split(" ")[0].replace(',', ''))
-                    with st.spinner("Consulting AI..."):
+            if st.button("Generate Opportunity Cost Table & Pattern Analysis", type="primary") and model:
+                if total_desire_spend == 0:
+                    st.success("Incredible discipline! You have zero 'Desire' spending logged. Keep investing the surplus.")
+                else:
+                    with st.spinner("Analyzing transaction DNA and calculating micro-opportunity costs..."):
+                        # Convert the dataframe to a string to send to the AI
+                        csv_data = edited_df[['Description', 'Amount', 'Tag']].to_csv(index=False)
+                        
                         prompt = f"""
-                        A user spent ₹{amount_match} on a non-essential item. 
-                        Provide 3 concrete, actionable investment or wealth-building alternatives for exactly ₹{amount_match} in India.
-                        Format as a numbered list. Keep reasons brief. End with a 1-sentence macro recommendation.
+                        You are an expert financial and behavioral analyst in India.
+                        Here is the user's categorized spending data for this period:
+                        {csv_data}
+                        
+                        Total Monthly Desire Spend: ₹{total_desire_spend}
+                        Future Value of these Desires invested in a monthly SIP for 1 year: ₹{sip_fv:,.2f}
+                        
+                        Please format your response EXACTLY into these 3 sections:
+                        
+                        ### 🔍 1. Micro-Opportunity Costs
+                        Create a crisp Markdown table ONLY for transactions tagged as "Desire". 
+                        For EACH desire, provide 3 highly specific, similarly-priced, and pragmatic alternative uses for that exact amount of money (e.g., if it's ₹200, suggest things like 'Half-month broadband', 'Tank of petrol', 'Protein-rich groceries', 'Term insurance premium').
+                        Columns must be: Description | Amount (₹) | Viable Alternative 1 | Viable Alternative 2 | Viable Alternative 3
+                        
+                        ### 🎯 2. The 1-Year Tangible Upgrade
+                        Based on their 1-Year SIP Future Value of ₹{sip_fv:,.2f}, suggest EXACTLY ONE tangible, high-value, life-enriching purchase or experience they could buy a year from now if they saved this money instead. Make it specific to the Indian context (e.g., a specific trip, a gadget, an upskilling course).
+                        
+                        ### 🧠 3. Behavioral Pattern & Verdict
+                        Analyze the descriptions of their 'Desire' spending. 
+                        - Identify their core spending trigger in ONE sentence. 
+                        - If you notice a trend toward unhealthy habits (e.g., lots of sugary/salty foods, fast food), explicitly flag the health risk in ONE sentence.
+                        - Give ONE sentence of actionable advice to shift to a better lifestyle/financial habit.
                         """
                         try:
-                            st.markdown(model.generate_content(prompt).text)
+                            response = model.generate_content(prompt)
+                            st.markdown(response.text)
                         except Exception as e:
                             st.error(f"API Error: {e}")
         else:
-            st.error("No 'Amount' column found in the uploaded data. Please ensure the extraction was successful.")
+            st.error("No 'Amount' column found in the uploaded data.")
 
 # ==========================================
 # TAB 3: THE INTERCEPTOR
