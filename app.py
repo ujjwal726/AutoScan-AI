@@ -11,7 +11,7 @@ st.set_page_config(page_title="WealthTrace AI", page_icon="📈", layout="wide")
 st.title("📈 WealthTrace AI")
 st.markdown("### The Zero-Trust Opportunity Cost Engine")
 
-# --- AUTHENTICATION ---
+# --- AUTHENTICATION & MULTI-MODEL SWITCH ---
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
@@ -19,8 +19,19 @@ else:
 
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    st.sidebar.success("🟢 System Online")
+    
+    # NEW: Sidebar Model Selector to bypass specific model quotas
+    st.sidebar.title("🤖 AI Settings")
+    model_choice = st.sidebar.selectbox(
+        "Select Model (Switch if Quota Full)",
+        ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
+    )
+    
+    try:
+        model = genai.GenerativeModel(model_choice)
+        st.sidebar.success(f"🟢 Active: {model_choice}")
+    except Exception as e:
+        st.sidebar.error(f"Model Error: {e}")
 else:
     st.sidebar.warning("API Key required.")
     st.stop()
@@ -49,10 +60,10 @@ with tab1:
                     df_v.to_csv(csv_b, index=False)
                     st.download_button("⬇️ Save CSV for Step 2", data=csv_b.getvalue(), file_name="secure_expenses.csv")
                 except Exception as e:
-                    st.error(f"Quota issue. Wait 60s. Error: {e}")
+                    st.error(f"Quota issue on {model_choice}. Try switching models in sidebar. Error: {e}")
 
 # ==========================================
-# TAB 2: WEALTH ENGINE (V1.16 - MANUAL TRIGGER)
+# TAB 2: WEALTH ENGINE (V1.17 - STABLE AUTO-TAG)
 # ==========================================
 with tab2:
     st.header("Step 2: Tag & Analyze")
@@ -69,25 +80,22 @@ with tab2:
             st.session_state.master_df = df
             st.session_state.current_file_name = clean_file.name
 
-        # --- THE NEW MANUAL AUTO-TAGGER ---
-        col_tag1, col_tag2 = st.columns([1, 4])
-        if col_tag1.button("✨ Run Auto-Tagger"):
-            with st.spinner("AI analyzing..."):
+        # --- MANUAL AUTO-TAGGER TRIGGER ---
+        if st.button("✨ Run Auto-Tagger"):
+            with st.spinner(f"AI ({model_choice}) analyzing..."):
                 try:
-                    df_to_tag = st.session_state.master_df
-                    items = df_to_tag['Description'].astype(str).tolist()
+                    items = st.session_state.master_df['Description'].astype(str).tolist()
                     tag_prompt = f"Categorize as 'Need', 'Desire', 'Salary', or 'Income'. JSON list only: {items}"
                     
                     tag_response = model.generate_content(tag_prompt).text
-                    start_idx = tag_response.find('[')
-                    end_idx = tag_response.rfind(']') + 1
-                    tags_list = json.loads(tag_response[start_idx:end_idx])
+                    s, e = tag_response.find('['), tag_response.rfind(']') + 1
+                    tags_list = json.loads(tag_response[s:e])
                     
-                    if len(tags_list) == len(df_to_tag):
+                    if len(tags_list) == len(st.session_state.master_df):
                         st.session_state.master_df["Tag"] = [str(t).strip().title() for t in tags_list]
-                        st.rerun() # Refresh to show tags
+                        st.rerun()
                 except Exception as e:
-                    st.error("Quota full. Please wait 60 seconds and try again.")
+                    st.error(f"Quota Full on {model_choice}. Switch models in the sidebar and try again.")
 
         edited_df = st.data_editor(
             st.session_state.master_df,
@@ -96,10 +104,10 @@ with tab2:
                 "Context": st.column_config.TextColumn("Context (Justification)")
             },
             use_container_width=True,
-            key="v16_editor"
+            key="v17_editor"
         )
         
-        # Summary Math
+        # Math Summary
         desires = edited_df[edited_df["Tag"] == "Desire"]
         total_desire = desires["Amount"].sum()
         sip_fv = total_desire * (((1.01)**12 - 1) / 0.01) * 1.01
@@ -116,7 +124,7 @@ with tab2:
                 try:
                     st.markdown(model.generate_content(prompt).text)
                 except Exception as e:
-                    st.error("Google is busy. Wait 60s and try again.")
+                    st.error("Model busy. Try switching in the sidebar.")
 
 # ==========================================
 # TAB 3: INTERCEPTOR
