@@ -59,7 +59,7 @@ with tab1:
         
         *Example:*
         * **12-March | Zomato (Burger) | 450**
-        * **14-March | Amazon Jacket | 1200**
+        * **14-March | Amazon | 15000**
         * **15-March | Salary | 50000**
         """)
         
@@ -85,6 +85,7 @@ with tab1:
                     
                     df_vision = pd.read_csv(io.StringIO(clean_csv_text))
                     df_vision["Tag"] = "Uncategorized"
+                    df_vision["Context"] = "" # Pre-load the context column for Step 2
                     
                     st.success("✅ Ledger Digitized Successfully!")
                     st.dataframe(df_vision)
@@ -96,7 +97,7 @@ with tab1:
                     st.error(f"Error reading image: Please ensure your handwriting is clear and try again. ({e})")
 
 # ==========================================
-# TAB 2: THE WEALTH ENGINE (CRASH-PROOF V1.6.1)
+# TAB 2: THE WEALTH ENGINE (V1.7 WITH USER DEFENSE)
 # ==========================================
 with tab2:
     st.header("Step 2: Tag & Analyze")
@@ -104,12 +105,13 @@ with tab2:
     clean_file = st.file_uploader("Upload Digitized Data (CSV)", type=["csv"], key="clean_upload")
     
     if clean_file:
-        # --- SMART PRE-PROCESSING: CRASH-PROOF AUTO-TAGGING ---
         if "last_processed_file" not in st.session_state or st.session_state.last_processed_file != clean_file.name:
             df = pd.read_csv(clean_file)
             
             if 'Tag' not in df.columns:
                 df['Tag'] = "Uncategorized"
+            if 'Context' not in df.columns:
+                df['Context'] = "" # Add blank context column if it's missing
                 
             if model and "Description" in df.columns:
                 with st.spinner("✨ AI is pre-reading your transactions and auto-tagging them..."):
@@ -126,112 +128,14 @@ with tab2:
                         if len(tags) == len(df):
                             df['Tag'] = tags
                     except Exception:
-                        pass # Silently fail back to Uncategorized if AI formats incorrectly
+                        pass 
             
-            # Save to memory so it doesn't loop
             st.session_state.auto_tagged_df = df
             st.session_state.last_processed_file = clean_file.name
 
-        # --- THE INTERACTIVE EDITOR ---
-        st.subheader("1. Financial Triage")
-        st.info("💡 **Agency Check:** The AI has auto-tagged your transactions. Please review them. Double-click any tag to manually override it.")
+        st.subheader("1. Financial Triage & Clarification")
+        st.info("💡 **Your Turn:** Review the auto-tags. If you have an unusually large expense (like ₹15,000 on Amazon), type a quick note in the **'Context'** column so the AI knows what it was before it judges the market rate.")
         
-        # We pass a key to ensure manual edits survive button clicks
+        # The updated editor now includes the Context column
         edited_df = st.data_editor(
-            st.session_state.auto_tagged_df,
-            key="expense_editor",
-            column_config={
-                "Tag": st.column_config.SelectboxColumn(
-                    "Tag", 
-                    options=["Need", "Desire", "Salary", "Income", "Uncategorized"], 
-                    required=True
-                )
-            },
-            use_container_width=True
-        )
-        
-        if "Amount" in edited_df.columns:
-            edited_df['Amount'] = pd.to_numeric(edited_df['Amount'], errors='coerce').fillna(0)
-            
-            desires_df = edited_df[edited_df["Tag"] == "Desire"]
-            total_desire_spend = desires_df["Amount"].sum()
-            
-            st.divider()
-            st.subheader("2. The 'Desire' Leakage & 1-Year SIP Potential")
-            
-            monthly_rate = 0.12 / 12
-            months = 12
-            sip_fv = total_desire_spend * (((1 + monthly_rate)**months - 1) / monthly_rate) * (1 + monthly_rate)
-            
-            col1, col2 = st.columns(2)
-            col1.metric("Total Monthly 'Desire' Spend", f"₹{total_desire_spend:,.2f}")
-            col2.metric("If Saved Monthly for 1 Year (12% SIP)", f"₹{sip_fv:,.2f}", delta=f"Wealth Created: +₹{sip_fv - (total_desire_spend * 12):,.2f}")
-            
-            st.divider()
-            st.subheader("3. Comprehensive Financial Therapy")
-            
-            if st.button("Generate Strategy Report", type="primary") and model:
-                with st.spinner("Analyzing market rates, finding opportunity costs, and generating insights..."):
-                    csv_data = edited_df[['Description', 'Amount', 'Tag']].to_csv(index=False)
-                    
-                    prompt = f"""
-                    You are an elite financial advisor and behavioral therapist in India.
-                    Here is the user's categorized spending data:
-                    {csv_data}
-                    
-                    Total Monthly Desire Spend: ₹{total_desire_spend}
-                    1-Year SIP Future Value: ₹{sip_fv:,.2f}
-                    
-                    Format your response EXACTLY into these 5 sections:
-                    
-                    ### 🌟 1. Financial Wins
-                    Identify 1 or 2 good financial decisions from the data (e.g., essential needs, income sources, or avoiding desires). Explicitly praise the user for these choices to reinforce good behavior.
-                    
-                    ### ⚠️ 2. Market Rate Warnings & Clarifications
-                    Scan the amounts for ALL transactions. 
-                    - Flag any transaction that seems exorbitant compared to standard Indian market rates (e.g., paying ₹1000 for a regular coffee). Warn them they are overpaying.
-                    - If a transaction is high but lacks context (e.g., ₹15,000 on 'Amazon'), explicitly ask the user for more details to determine if it was justified or excessive.
-                    
-                    ### 🔍 3. Micro-Opportunity Costs
-                    Create a Markdown table ONLY for transactions tagged as "Desire". 
-                    For EACH desire, provide 3 highly specific, similarly-priced, pragmatic alternative uses for that exact amount in India (e.g., 'Half-month broadband', 'Tank of petrol', 'Term insurance premium').
-                    Columns: Description | Amount (₹) | Viable Alternative 1 | Viable Alternative 2 | Viable Alternative 3
-                    
-                    ### 🎯 4. The 1-Year Tangible Upgrade
-                    Based on the 1-Year SIP Future Value of ₹{sip_fv:,.2f}, suggest EXACTLY ONE tangible, high-value, life-enriching purchase or experience they could buy a year from now if they saved this money instead.
-                    
-                    ### 🧠 5. Behavioral Pattern & Verdict
-                    Analyze the descriptions of their 'Desire' spending. 
-                    - Identify their core spending trigger in ONE sentence. 
-                    - If you notice a trend toward unhealthy habits (e.g., sugary/salty foods), explicitly flag the health risk.
-                    - Give ONE sentence of actionable advice to shift to a better lifestyle/financial habit.
-                    """
-                    try:
-                        response = model.generate_content(prompt)
-                        st.markdown(response.text)
-                    except Exception as e:
-                        st.error(f"API Error: {e}")
-        else:
-            st.error("No 'Amount' column found in the uploaded data.")
-
-# ==========================================
-# TAB 3: THE INTERCEPTOR
-# ==========================================
-with tab3:
-    st.header("Step 3: The Pre-Spend Interceptor")
-    st.write("About to make an impulse purchase online? Run it through the engine first.")
-    with st.container(border=True):
-        item_name = st.text_input("What are you about to buy?")
-        item_price = st.number_input("Price (₹)", min_value=0, step=100)
-        
-        if st.button("Evaluate Purchase", type="primary") and model and item_price > 0:
-            fv = item_price * ((1 + 0.12) ** 10)
-            st.error(f"⚠️ **Wait!** That ₹{item_price:,.2f} today will cost you **₹{fv:,.2f}** in 10 years.")
-            
-            with st.spinner("Finding better uses for this capital..."):
-                prompt2 = f"A user is about to spend ₹{item_price} on '{item_name}'. Provide 2 concrete investment alternatives in India, and 1 psychological question to reconsider the purchase."
-                try:
-                    st.markdown("---")
-                    st.markdown(model.generate_content(prompt2).text)
-                except Exception as e:
-                    st.error(f"API Error: {e}")
+            st.session_state.auto_
