@@ -10,7 +10,8 @@ st.set_page_config(page_title="WealthTrace AI", page_icon="📈", layout="wide")
 st.title("📈 WealthTrace AI")
 st.markdown("### Privacy-First Opportunity Cost & Wealth Engine")
 
-# --- AUTHENTICATION ---
+# --- AUTHENTICATION & DYNAMIC MODEL SELECTION ---
+model = None
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
@@ -18,10 +19,27 @@ else:
 
 if api_key:
     genai.configure(api_key=api_key)
-    # Using the standard 1.5-flash model as it handles both text and vision flawlessly
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    try:
+        # Dynamically find the best available model for your specific API key
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        if 'models/gemini-1.5-flash' in available_models:
+            target_model = 'gemini-1.5-flash'
+        elif 'models/gemini-1.5-flash-latest' in available_models:
+            target_model = 'gemini-1.5-flash-latest'
+        elif 'models/gemini-pro-vision' in available_models:
+            target_model = 'gemini-pro-vision'
+        elif available_models:
+            target_model = available_models[0].replace('models/', '')
+        else:
+            target_model = 'gemini-1.5-flash' # Safe fallback
+            
+        model = genai.GenerativeModel(target_model)
+        st.sidebar.success(f"🟢 Connected to: {target_model.replace('models/', '')}")
+    except Exception as e:
+        st.sidebar.error(f"API Connection Error: {e}")
 else:
-    st.sidebar.warning("API Key required for the Vision Scanner (Tab 1) and Strategy modules (Tabs 2 & 3).")
+    st.sidebar.warning("API Key required for Vision Scanner (Tab 1) and Strategy modules (Tabs 2 & 3).")
 
 # --- NAVIGATION TABS ---
 tab1, tab2, tab3 = st.tabs(["🛡️ 1. Data Ingestion", "🧠 2. The Wealth Engine", "🛑 3. Pre-Spend Interceptor"])
@@ -42,7 +60,7 @@ with tab1:
         
         photo_file = st.file_uploader("Upload Photo (JPG/PNG)", type=["jpg", "jpeg", "png"])
         
-        if photo_file and api_key:
+        if photo_file and model:
             image = Image.open(photo_file)
             st.image(image, caption="Your Ledger", use_container_width=True)
             
@@ -136,38 +154,46 @@ with tab2:
             use_container_width=True
         )
         
-        desires_df = edited_df[edited_df["Tag"] == "Desire"]
-        total_desire_spend = desires_df["Amount"].sum() if "Amount" in desires_df.columns else 0
-        
-        st.divider()
-        st.subheader("2. Opportunity Cost Math")
-        rate = 0.12 
-        years = 10
-        future_value = total_desire_spend * ((1 + rate) ** years)
-        
-        col1, col2 = st.columns(2)
-        col1.metric("Total 'Desire' Spend", f"₹{total_desire_spend:,.2f}")
-        col2.metric("10-Year Opportunity Cost (12% CAGR)", f"₹{future_value:,.2f}", delta=f"+₹{future_value - total_desire_spend:,.2f}")
-        
-        st.divider()
-        st.subheader("3. AI Wealth Strategist")
-        
-        if not desires_df.empty and api_key and "Amount" in desires_df.columns:
-            options = desires_df.apply(lambda row: f"₹{row['Amount']} on {row.get('Description', 'Item')}", axis=1).tolist()
-            selected_trans = st.selectbox("Select a 'Desire' transaction to analyze:", options)
+        # Make sure Amount column exists before calculating
+        if "Amount" in edited_df.columns:
+            # Ensure Amount is numeric
+            edited_df['Amount'] = pd.to_numeric(edited_df['Amount'], errors='coerce').fillna(0)
+            desires_df = edited_df[edited_df["Tag"] == "Desire"]
+            total_desire_spend = desires_df["Amount"].sum()
             
-            if st.button("Generate Investment Alternatives"):
-                amount_match = float(selected_trans.split("₹")[1].split(" ")[0].replace(',', ''))
-                with st.spinner("Consulting AI..."):
-                    prompt = f"""
-                    A user spent ₹{amount_match} on a non-essential item. 
-                    Provide 3 concrete, actionable investment or wealth-building alternatives for exactly ₹{amount_match} in India.
-                    Format as a numbered list. Keep reasons brief. End with a 1-sentence macro recommendation.
-                    """
-                    try:
-                        st.markdown(model.generate_content(prompt).text)
-                    except Exception as e:
-                        st.error(f"API Error: {e}")
+            st.divider()
+            st.subheader("2. Opportunity Cost Math")
+            rate = 0.12 
+            years = 10
+            future_value = total_desire_spend * ((1 + rate) ** years)
+            
+            col1, col2 = st.columns(2)
+            col1.metric("Total 'Desire' Spend", f"₹{total_desire_spend:,.2f}")
+            col2.metric("10-Year Opportunity Cost (12% CAGR)", f"₹{future_value:,.2f}", delta=f"+₹{future_value - total_desire_spend:,.2f}")
+            
+            st.divider()
+            st.subheader("3. AI Wealth Strategist")
+            
+            if not desires_df.empty and model:
+                # Create a list of readable options for the dropdown
+                desc_col = 'Description' if 'Description' in desires_df.columns else desires_df.columns[1] # fallback to 2nd col
+                options = desires_df.apply(lambda row: f"₹{row['Amount']} on {row.get(desc_col, 'Item')}", axis=1).tolist()
+                selected_trans = st.selectbox("Select a 'Desire' transaction to analyze:", options)
+                
+                if st.button("Generate Investment Alternatives"):
+                    amount_match = float(selected_trans.split("₹")[1].split(" ")[0].replace(',', ''))
+                    with st.spinner("Consulting AI..."):
+                        prompt = f"""
+                        A user spent ₹{amount_match} on a non-essential item. 
+                        Provide 3 concrete, actionable investment or wealth-building alternatives for exactly ₹{amount_match} in India.
+                        Format as a numbered list. Keep reasons brief. End with a 1-sentence macro recommendation.
+                        """
+                        try:
+                            st.markdown(model.generate_content(prompt).text)
+                        except Exception as e:
+                            st.error(f"API Error: {e}")
+        else:
+            st.error("No 'Amount' column found in the uploaded data.")
 
 # ==========================================
 # TAB 3: THE INTERCEPTOR
@@ -178,7 +204,7 @@ with tab3:
         item_name = st.text_input("What are you about to buy?")
         item_price = st.number_input("Price (₹)", min_value=0, step=100)
         
-        if st.button("Evaluate Purchase", type="primary") and api_key and item_price > 0:
+        if st.button("Evaluate Purchase", type="primary") and model and item_price > 0:
             fv = item_price * ((1 + 0.12) ** 10)
             st.error(f"⚠️ **Wait!** That ₹{item_price:,.2f} today will cost you **₹{fv:,.2f}** in 10 years.")
             
