@@ -10,8 +10,7 @@ st.set_page_config(page_title="WealthTrace AI", page_icon="📈", layout="wide")
 st.title("📈 WealthTrace AI")
 st.markdown("### The Zero-Trust Opportunity Cost Engine")
 
-# --- AUTHENTICATION & AGGRESSIVE MODEL FINDER ---
-model = None
+# --- AUTHENTICATION & MODEL FINDER ---
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
@@ -20,23 +19,12 @@ else:
 if api_key:
     genai.configure(api_key=api_key)
     try:
-        # THE HUNTER: We look for any model that supports content generation
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # Priority List: 1. Flash (Fast/Free) -> 2. Pro (Smart/Heavy) -> 3. Any available
-        if 'models/gemini-1.5-flash' in available_models:
-            target_model = 'gemini-1.5-flash'
-        elif 'models/gemini-1.5-pro' in available_models:
-            target_model = 'gemini-1.5-pro'
-        elif available_models:
-            target_model = available_models[0].replace('models/', '')
-        else:
-            target_model = 'gemini-1.5-flash' # Default fallback
-
+        target_model = 'gemini-1.5-flash' if 'models/gemini-1.5-flash' in available_models else available_models[0].replace('models/', '')
         model = genai.GenerativeModel(target_model)
         st.sidebar.success(f"🟢 Active Model: {target_model}")
     except Exception as e:
-        st.sidebar.error(f"Model Discovery Error: {e}")
+        st.sidebar.error(f"Discovery Error: {e}")
 else:
     st.sidebar.warning("Enter API Key to start.")
     st.stop()
@@ -65,56 +53,68 @@ with tab1:
                     df_v.to_csv(csv_b, index=False)
                     st.download_button("⬇️ Save CSV for Step 2", data=csv_b.getvalue(), file_name="secure_expenses.csv")
                 except Exception as e:
-                    st.error(f"Quota error or Model issue. Wait 60s. Error: {e}")
+                    st.error(f"Error: {e}")
 
 # ==========================================
-# TAB 2: WEALTH ENGINE (V1.13 - ROBUST AUTO-TAG)
+# TAB 2: WEALTH ENGINE (V1.14 - FORCED AUTO-TAG)
 # ==========================================
 with tab2:
     st.header("Step 2: Tag & Analyze")
     clean_file = st.file_uploader("Upload CSV", type=["csv"], key="w_up")
     
     if clean_file:
-        # Check if fresh upload
+        # Check if fresh upload or if tags are missing
         if "master_df" not in st.session_state or st.session_state.get("current_file_name") != clean_file.name:
-            raw_df = pd.read_csv(clean_file)
+            df = pd.read_csv(clean_file)
             
-            # Absolute math for ₹-11,000 style entries
-            if "Amount" in raw_df.columns:
-                raw_df['Amount'] = pd.to_numeric(raw_df['Amount'], errors='coerce').abs().fillna(0)
+            # Numeric cleanup
+            if "Amount" in df.columns:
+                df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').abs().fillna(0)
             
-            # --- THE AUTO-TAGGING ENGINE ---
-            with st.spinner("🧠 AI Auto-Tagging in progress..."):
+            # 1. PRE-PREPARE COLUMNS
+            df["Tag"] = "Uncategorized"
+            df["Context"] = ""
+
+            # 2. THE AUTO-TAGGING INJECTION
+            with st.spinner("🧠 AI is analyzing and injecting tags..."):
                 try:
-                    descriptions = raw_df['Description'].astype(str).tolist()
-                    tag_prompt = f"Categorize as 'Need', 'Desire', 'Salary', or 'Income'. JSON list only: {descriptions}"
+                    descriptions = df['Description'].astype(str).tolist()
+                    tag_prompt = f"""
+                    Categorize each item as exactly 'Need', 'Desire', 'Salary', or 'Income'. 
+                    Items: {descriptions}
+                    Return ONLY a JSON list of strings. No markdown.
+                    """
                     tag_response = model.generate_content(tag_prompt).text
                     
-                    # JSON Cleanup for stable mapping
-                    s, e = tag_response.find('['), tag_response.rfind(']') + 1
-                    tags_list = json.loads(tag_response[s:e])
+                    # Robust extraction
+                    start_idx = tag_response.find('[')
+                    end_idx = tag_response.rfind(']') + 1
+                    tags_list = json.loads(tag_response[start_idx:end_idx])
                     
-                    if len(tags_list) == len(raw_df):
-                        raw_df["Tag"] = [t.strip().title() for t in tags_list]
-                    else:
-                        raw_df["Tag"] = "Uncategorized"
-                except:
-                    raw_df["Tag"] = "Uncategorized"
+                    # 3. FORCED INJECTION: We manually overwrite the Tag column
+                    if len(tags_list) == len(df):
+                        df["Tag"] = [str(t).strip().title() for t in tags_list]
+                except Exception as e:
+                    st.warning(f"AI Tagging skipped: {e}")
             
-            raw_df["Context"] = ""
-            st.session_state.master_df = raw_df
+            # 4. LOCK INTO SESSION STATE
+            st.session_state.master_df = df
             st.session_state.current_file_name = clean_file.name
-            st.toast("✅ Auto-Tagging Complete!", icon="✨")
+            st.toast("✨ Auto-Tagging Complete!")
 
-        # Interactive Table
+        # Display the editor with the locked-in tags
         edited_df = st.data_editor(
             st.session_state.master_df,
             column_config={
-                "Tag": st.column_config.SelectboxColumn("Tag", options=["Need", "Desire", "Salary", "Income"], required=True),
+                "Tag": st.column_config.SelectboxColumn(
+                    "Tag", 
+                    options=["Need", "Desire", "Salary", "Income", "Uncategorized"], 
+                    required=True
+                ),
                 "Context": st.column_config.TextColumn("Context (Justify here)")
             },
             use_container_width=True,
-            key="v13_stable_editor"
+            key="v14_locked_editor"
         )
         
         # Immediate Math Summary
@@ -128,22 +128,22 @@ with tab2:
         c2.metric("1-Year SIP Potential", f"₹{sip_fv:,.2f}")
         
         if st.button("Generate Strategy Report", type="primary"):
-            with st.spinner("Generating crisp analysis..."):
+            with st.spinner("Analyzing..."):
                 csv_data = edited_df[['Description', 'Amount', 'Tag', 'Context']].to_csv(index=False)
                 crisp_prompt = f"""
-                Data: {csv_data} | SIP: ₹{sip_fv:,.2f}
-                Task: Provide a CRISP Indian financial report.
+                Data: {csv_data} | SIP Total: ₹{sip_fv:,.2f}
+                Provide a CRISP Indian financial report.
                 1. WINS: 1 bullet praise.
-                2. WARNINGS: Flag exorbitant costs. If 'Context' exists, analyze it rationally.
+                2. WARNINGS: Flag exorbitant costs. Analyze 'Context' reasoning.
                 3. ALTERNATIVES: Table of Desires with 3 crisp Indian alternatives.
                 4. GOAL: One life-upgrade for ₹{sip_fv:,.2f}.
-                5. VERDICT: 1-sentence behavioral fix.
+                5. VERDICT: 1-sentence behavioral pattern fix.
                 STRICT: Max 180 words.
                 """
                 try:
                     st.markdown(model.generate_content(crisp_prompt).text)
                 except Exception as e:
-                    st.error(f"Quota issue. Wait 60s and try again. Error: {e}")
+                    st.error(f"Wait 60s for Quota reset. Error: {e}")
 
 # ==========================================
 # TAB 3: INTERCEPTOR
@@ -154,4 +154,4 @@ with tab3:
     price = st.number_input("Price (₹)", min_value=0)
     if st.button("Evaluate", type="primary") and price > 0:
         st.error(f"🛑 10-Year Opportunity Cost: ₹{price * (1.12**10):,.2f}")
-        st.markdown(model.generate_content(f"Item: {item}, Price: {price}. Give 2 crisp Indian investments.").text)
+        st.markdown(model.generate_content(f"Item: {item}, Price: {price}. Give 2 crisp Indian investment alternatives.").text)
