@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import io
-import json
 from PIL import Image
 
 # --- CONFIGURATION ---
@@ -10,7 +9,8 @@ st.set_page_config(page_title="WealthTrace AI", page_icon="📈", layout="wide")
 st.title("📈 WealthTrace AI")
 st.markdown("### The Zero-Trust Opportunity Cost Engine")
 
-# --- AUTHENTICATION ---
+# --- AUTHENTICATION & DYNAMIC MODEL FINDER ---
+model = None
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
@@ -18,14 +18,30 @@ else:
 
 if api_key:
     genai.configure(api_key=api_key)
-    # Using a stable model name directly to avoid discovery errors
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    st.sidebar.success("🟢 Secured Connection Active")
+    try:
+        # THE DYNAMIC MODEL FINDER: We return to the logic that worked!
+        # It asks the API: "What models do you have?" and picks the right one.
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        if 'models/gemini-1.5-flash' in available_models:
+            target_model = 'gemini-1.5-flash'
+        elif 'models/gemini-1.5-flash-latest' in available_models:
+            target_model = 'gemini-1.5-flash-latest'
+        elif 'models/gemini-pro-vision' in available_models:
+            target_model = 'gemini-pro-vision'
+        else:
+            # Fallback to the first available content-generating model
+            target_model = available_models[0].replace('models/', '')
+            
+        model = genai.GenerativeModel(target_model)
+        st.sidebar.success(f"🟢 Secured Connection: {target_model}")
+    except Exception as e:
+        st.sidebar.error(f"Model Discovery Error: {e}")
 else:
-    st.sidebar.warning("API Key required for the AI modules.")
-    st.stop() # Prevents the rest of the app from running without a key
+    st.sidebar.warning("API Key required to run the AI Wealth Engine.")
+    st.stop()
 
-# --- NAVIGATION ---
+# --- NAVIGATION TABS ---
 tab1, tab2, tab3 = st.tabs(["📸 1. Secure Ledger Upload", "🧠 2. The Wealth Engine", "🛑 3. Pre-Spend Interceptor"])
 
 # ==========================================
@@ -36,14 +52,9 @@ with tab1:
     st.error("🔒 **ZERO-TRUST PROTOCOL:** Hand-written paper notes only. We do not want your official bank data.")
     
     with st.container(border=True):
-        st.markdown("""
-        **📝 How to write it:**
-        * 12-March | Zomato (Burger) | 450
-        * 14-March | Amazon | 15000
-        * 15-March | Salary | 50000
-        """)
+        st.markdown("**📝 Format Example:** 12-March | Zomato (Burger) | 450")
         
-    photo_file = st.file_uploader("Upload Photo (JPG/PNG)", type=["jpg", "jpeg", "png"])
+    photo_file = st.file_uploader("Upload Photo of Handwritten Ledger (JPG/PNG)", type=["jpg", "jpeg", "png"])
     
     if photo_file:
         image = Image.open(photo_file)
@@ -57,7 +68,7 @@ with tab1:
                     clean_csv_text = response.text.replace("```csv\n", "").replace("```", "").strip()
                     df_vision = pd.read_csv(io.StringIO(clean_csv_text), names=["Date", "Description", "Amount"])
                     
-                    st.success("✅ Ledger Digitized!")
+                    st.success("✅ Ledger Digitized Successfully!")
                     st.dataframe(df_vision)
                     
                     csv_buffer = io.StringIO()
@@ -67,98 +78,73 @@ with tab1:
                     st.error(f"Handwriting Extraction Error: {e}")
 
 # ==========================================
-# TAB 2: THE WEALTH ENGINE (V1.8 REBUILT)
+# TAB 2: THE WEALTH ENGINE (WITH CONTEXT & PRAISE)
 # ==========================================
 with tab2:
     st.header("Step 2: Tag & Analyze")
     st.write("Upload the clean CSV you just downloaded from Step 1.")
-    clean_file = st.file_uploader("Upload Digitized Data (CSV)", type=["csv"], key="wealth_upload")
+    clean_file = st.file_uploader("Upload Digitized Data (CSV)", type=["csv"], key="w_up")
     
     if clean_file:
-        # Load file fresh every time to avoid state crashes
         df = pd.read_csv(clean_file)
         
-        # Ensure base columns exist
+        # Ensure critical columns exist
         if "Amount" in df.columns:
             df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
-        if "Context" not in df.columns:
-            df["Context"] = ""
-        
-        # --- ROBUST AUTO-TAGGING ---
-        # We check if tags already exist; if not, we ask AI to guess once.
-        if "Tag" not in df.columns or df["Tag"].isnull().all() or (df["Tag"] == "Uncategorized").all():
-            with st.spinner("✨ AI is pre-tagging your transactions..."):
-                try:
-                    desc_list = df['Description'].astype(str).tolist()
-                    tag_prompt = f"Categorize these items into: Need, Desire, Salary, Income. Return as a JSON list of strings. Items: {desc_list}"
-                    res_text = model.generate_content(tag_prompt).text
-                    # JSON Cleanup
-                    start = res_text.find('[')
-                    end = res_text.rfind(']') + 1
-                    tags = json.loads(res_text[start:end])
-                    
-                    if len(tags) == len(df):
-                        df["Tag"] = [t.title() for t in tags]
-                    else:
-                        df["Tag"] = "Uncategorized"
-                except:
-                    df["Tag"] = "Uncategorized"
+        if "Tag" not in df.columns: df["Tag"] = "Uncategorized"
+        if "Context" not in df.columns: df["Context"] = ""
 
         st.subheader("1. Financial Triage & Clarification")
-        st.info("💡 **Agency Check:** AI has auto-tagged your spending. Review them below. Use the 'Context' column to explain large amounts (e.g. 'New Phone') before generating the report.")
+        st.info("💡 Review the tags. Add a note in **'Context'** for large expenses (e.g., 'Parents Anniversary Gift') to defend the purchase to the AI.")
         
-        # DISPLAY THE TABLE
         edited_df = st.data_editor(
             df,
             column_config={
                 "Tag": st.column_config.SelectboxColumn("Tag", options=["Need", "Desire", "Salary", "Income", "Uncategorized"], required=True),
-                "Context": st.column_config.TextColumn("Context (Optional)", help="Explain large purchases here.")
+                "Context": st.column_config.TextColumn("Context (Optional)")
             },
             use_container_width=True,
-            key="editor_stable_v1.8"
+            key="final_stable_editor"
         )
         
-        # --- ANALYSIS SECTION ---
+        # Analysis calculations
         desires = edited_df[edited_df["Tag"] == "Desire"]
         total_desire = desires["Amount"].sum()
+        sip_fv = total_desire * (((1.01)**12 - 1) / 0.01) * 1.01
         
         st.divider()
-        col1, col2 = st.columns(2)
-        col1.metric("Total Monthly 'Desire' Spend", f"₹{total_desire:,.2f}")
+        c1, c2 = st.columns(2)
+        c1.metric("Monthly 'Desire' Leakage", f"₹{total_desire:,.2f}")
+        c2.metric("1-Year SIP Potential (12% CAGR)", f"₹{sip_fv:,.2f}")
         
-        # SIP Calculation
-        sip_fv = total_desire * (((1.01)**12 - 1) / 0.01) * 1.01
-        col2.metric("1-Year SIP Potential (12% CAGR)", f"₹{sip_fv:,.2f}")
-        
-        if st.button("Generate Comprehensive Strategy Report", type="primary"):
+        if st.button("Generate Strategy Report", type="primary"):
             with st.spinner("Analyzing market rates and behavioral patterns..."):
-                csv_summary = edited_df[['Description', 'Amount', 'Tag', 'Context']].to_csv(index=False)
-                
-                final_prompt = f"""
+                csv_sum = edited_df[['Description', 'Amount', 'Tag', 'Context']].to_csv(index=False)
+                final_report_prompt = f"""
                 Analyze this Indian spending data:
-                {csv_summary}
+                {csv_sum}
                 
                 Report Requirements:
-                1. FINANCIAL WINS: Praise the user for specific good decisions (essentials or income).
-                2. MARKET RATE WARNINGS: Flag any exorbitant prices. Check the 'Context' column—if the user explained the purchase (e.g. 'Washing Machine'), acknowledge and validate it. If context is missing for a high amount, warn them.
-                3. MICRO-OPPORTUNITY COSTS: Create a table for 'Desire' items showing 3 crisp Indian alternatives (e.g. petrol, bills, healthy groceries).
-                4. SAVINGS VERTICAL: Suggest ONE high-value thing they can buy with the 1-year SIP wealth of ₹{sip_fv:,.2f}.
-                5. BEHAVIORAL VERDICT: Identify their spending trigger (e.g. sugar, electronics) and flag health/financial risks in one line.
+                1. FINANCIAL WINS: Praise specific good choices (e.g., essential needs, income).
+                2. MARKET WARNINGS: Flag exorbitant prices. IMPORTANT: Check the 'Context' column—if the user explained the purchase, validate it instead of warning them.
+                3. MICRO-OPPORTUNITY COSTS: Table for 'Desire' items showing 3 crisp Indian alternatives (e.g., broadband, fuel, healthy food).
+                4. SAVINGS GOAL: Suggest what tangible thing they can buy with ₹{sip_fv:,.2f} in 1 year.
+                5. BEHAVIORAL VERDICT: Identify spending triggers and flag health/financial risks.
                 """
                 try:
-                    st.markdown(model.generate_content(final_prompt).text)
+                    st.markdown(model.generate_content(final_report_prompt).text)
                 except Exception as e:
                     st.error(f"Analysis failed: {e}")
 
 # ==========================================
-# TAB 3: THE INTERCEPTOR (STABLE)
+# TAB 3: THE INTERCEPTOR
 # ==========================================
 with tab3:
     st.header("Step 3: Pre-Spend Interceptor")
-    item = st.text_input("Product Name")
+    item = st.text_input("What are you about to buy?")
     price = st.number_input("Price (₹)", min_value=0)
     
-    if st.button("Evaluate", type="primary") and price > 0:
+    if st.button("Evaluate Purchase", type="primary") and price > 0:
         fv_10 = price * (1.12**10)
         st.error(f"🛑 10-Year Opportunity Cost: ₹{fv_10:,.2f}")
         st.markdown(model.generate_content(f"Item: {item}, Price: {price}. Give 2 Indian investment alternatives and 1 psychological question.").text)
