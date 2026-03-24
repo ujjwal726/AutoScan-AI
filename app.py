@@ -325,7 +325,7 @@ if api_key:
                 
                 OUTPUT FORMAT:
                 ### 🔮 Professional 7-Day Forecast & Order Guide
-                | Item Name | Status | Recommendation | Why this? |
+                | Item Name | Status | Recommendation(Buy Quantity) | Why this? |
                 | :--- | :--- | :--- | :--- |
                 | [Item] | [🔴/🟡/🟢] | **[Buy Qty]** | [Reasoning in plain English] |
 
