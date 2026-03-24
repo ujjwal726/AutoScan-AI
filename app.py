@@ -150,33 +150,38 @@ if user_key:
                 st.session_state['temp_sales'] = None
                 st.success("Sales record saved successfully!")
                 st.rerun()
-
-    # --- MODE: DASHBOARD (Updated Calculation Logic) ---
+                
+# --- MODE: DASHBOARD (Strict Template Edition) ---
     elif mode == "📊 Inventory Dashboard":
         st.header("📊 Real-Time Inventory & Financial Dashboard")
         
         if not st.session_state['all_inventory'] and not st.session_state['all_sales']:
             st.warning("No data found. Please add verified Stock or Sales first.")
         else:
-            with st.spinner('AI is calculating real-time inventory levels...'):
-                # PROMPT: Send both master strings to AI for mathematical aggregation
+            with st.spinner('Calculating totals...'):
+                # FIXED TEMPLATE PROMPT
                 calculation_prompt = f"""
-                You are a Retail Data Analyst. Use the following two ledgers to calculate current business status.
+                You are a Retail Accounting System. Use these ledgers:
+                INVENTORY: {st.session_state['all_inventory']}
+                SALES: {st.session_state['all_sales']}
                 
-                MASTER INVENTORY (IN):
-                {st.session_state['all_inventory']}
+                OUTPUT RULES:
+                1. All monetary values must be in Rupees (₹).
+                2. Calculate: Remaining = (Sum of IN Qty) - (Sum of OUT Qty).
+                3. You MUST follow this EXACT format:
+
+                ### 📦 Inventory Status
+                | Item Name | Category | Total In | Total Out | Remaining | Current Value (₹) |
+                | :--- | :--- | :--- | :--- | :--- | :--- |
+                | [Item] | [Cat] | [Qty] | [Qty] | [Qty] | [₹ Total] |
+
+                ### 💰 Financial Summary
+                - **Total Investment:** ₹[Amount]
+                - **Total Revenue:** ₹[Amount]
+                - **Cash in Hand:** ₹[Amount]
+                - **Total Udhari (Credit):** ₹[Amount]
                 
-                MASTER SALES (OUT):
-                {st.session_state['all_sales']}
-                
-                TASKS:
-                1. Group by 'Item Name' and calculate: [Total In - Total Out = Remaining Stock].
-                2. Format as a clean Markdown Table: [Item Name, Category, Total In, Total Out, Remaining Stock, Current Value].
-                3. Financial Summary:
-                   - Total Investment (Cost of all IN items).
-                   - Total Revenue (Sum of all OUT totals).
-                   - Total Cash in Hand (Sum of all CASH sales).
-                   - Total Udhari Owed (Sum of all CREDIT sales).
+                4. Do not add any conversational text before or after the tables.
                 """
                 
                 calc_response = model.generate_content(calculation_prompt)
