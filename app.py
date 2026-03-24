@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 from openai import OpenAI
 from groq import Groq
+import anthropic # Added for Claude integration
 import pandas as pd
 from PIL import Image
 
@@ -10,8 +11,8 @@ st.set_page_config(page_title="End-to-End Inventory System", layout="wide")
 # --- 1. MULTI-PROVIDER AUTHENTICATION & DISCOVERY ---
 st.sidebar.title("🔐 System Access")
 
-# Provider Selection
-provider = st.sidebar.selectbox("🌐 Choose AI Provider:", ["Google Gemini", "Groq (Llama - High Speed)", "OpenAI (GPT)"])
+# Provider Selection - Updated with Anthropic
+provider = st.sidebar.selectbox("🌐 Choose AI Provider:", ["Google Gemini", "Groq (Llama - High Speed)", "OpenAI (GPT)", "Anthropic (Claude)"])
 
 # Dynamic Help Notes for Users
 if provider == "Google Gemini":
@@ -23,6 +24,9 @@ elif provider == "Groq (Llama - High Speed)":
 elif provider == "OpenAI (GPT)":
     st.sidebar.info("💡 **Note:** You need an **OpenAI Platform API Key**.")
     st.sidebar.caption("[Get OpenAI Key here](https://platform.openai.com/api-keys)")
+elif provider == "Anthropic (Claude)":
+    st.sidebar.info("💡 **Note:** Claude is the 'Reasoning King'—perfect for complex math.")
+    st.sidebar.caption("[Get Anthropic Key here](https://console.anthropic.com/)")
 
 api_key = st.sidebar.text_input(f"Enter {provider} API Key", type="password")
 model_instance = None
@@ -76,6 +80,31 @@ if api_key:
         except Exception as e:
             st.sidebar.error("❌ Invalid OpenAI Key or Connection Error.")
 
+    # --- ANTHROPIC (CLAUDE) INTEGRATION ---
+    elif provider == "Anthropic (Claude)":
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            claude_models = ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"]
+            selected_model = st.sidebar.selectbox("🧠 Select Claude Model:", claude_models)
+            
+            class ClaudeWrapper:
+                def __init__(self, client, name):
+                    self.client = client
+                    self.name = name
+                def generate_content(self, contents):
+                    # Convert input format to Claude's message structure
+                    res = self.client.messages.create(
+                        model=self.name,
+                        max_tokens=2048,
+                        messages=[{"role": "user", "content": str(contents)}]
+                    )
+                    class Resp: 
+                        def __init__(self, t): self.text = t
+                    return Resp(res.content[0].text)
+            model_instance = ClaudeWrapper(client, selected_model)
+        except Exception as e:
+            st.sidebar.error("❌ Invalid Anthropic Key or Connection Error.")
+
 # --- 2. THE ERROR-HANDLING WRAPPER ---
 def safe_generate(prompt_data):
     """Executes AI call and catches Quota/Resource errors."""
@@ -86,8 +115,8 @@ def safe_generate(prompt_data):
         return model_instance.generate_content(prompt_data)
     except Exception as e:
         err_msg = str(e).lower()
-        if any(x in err_msg for x in ["429", "resource_exhausted", "insufficient_quota", "rate_limit"]):
-            st.error("🚨 **API Limit Reached!**")
+        if any(x in err_msg for x in ["429", "resource_exhausted", "insufficient_quota", "rate_limit", "overloaded"]):
+            st.error("🚨 **AI Provider Busy or Limit Reached!**")
             st.warning("Please switch to another model or provider in the sidebar.")
         else:
             st.error(f"⚠️ AI Connection Error: {e}")
@@ -106,7 +135,6 @@ if api_key:
 
     # --- NAVIGATION ---
     st.sidebar.divider()
-    # ADDED FORECAST OPTION HERE
     mode = st.sidebar.radio("Select Action:", ["📈 Daily Sales (Out)", "📦 Add New Stock (In)", "📊 Inventory Dashboard", "🔮 Weekly Sales Forecast"])
 
     # --- ADMINISTRATIVE RESET SWITCH ---
@@ -295,7 +323,7 @@ if api_key:
                 st.subheader("📉 Master Sales (OUT)")
                 st.markdown(st.session_state['all_sales'] if st.session_state['all_sales'] else "Empty")
 
-    # --- NEW MODE: WEEKLY SALES FORECAST ---
+    # --- MODE: WEEKLY SALES FORECAST ---
     elif mode == "🔮 Weekly Sales Forecast":
         st.header("🔮 AI Sales & Inventory Forecast (Next 7 Days)")
         
