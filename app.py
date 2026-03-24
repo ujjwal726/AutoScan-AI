@@ -304,30 +304,37 @@ if api_key:
         else:
             with st.spinner('AI is simulating market demand for next week...'):
                 prediction_prompt = f"""
-                You are a Retail Strategy Expert. Analyze these ledgers:
-                SALES HISTORY (Last 7 Days): {st.session_state['all_sales']}
-                CURRENT STOCK: {st.session_state['all_inventory']}
+                You are a Retail Data Scientist. 
+                TODAY'S DATE: March 24, 2026.
                 
-                TASK:
-                1. Forecast Sales: Predict quantity for each item for the NEXT 7 days based on current velocity.
-                2. Identify Stock-Out Risks: Which items will run out before next week ends?
-                3. Purchase Recommendation: Suggest exact quantities to order today.
+                DATA SETS:
+                SALES HISTORY (OUT): {st.session_state['all_sales']}
+                CURRENT STOCK (IN - OUT): {st.session_state['all_inventory']}
+                
+                METHODOLOGY:
+                1. Calculate Daily Burn Rate: For each item, find Total Sales Qty divided by the number of unique days in the sales ledger.
+                2. 7-Day Forecast: Multiply Daily Burn Rate by 7.
+                3. Safety Stock: Add 20% to the 7-Day Forecast to account for demand spikes.
+                4. Net Requirement: (7-Day Forecast + Safety Stock) - Current On-Hand Stock.
                 
                 OUTPUT FORMAT:
-                ### 📈 Next Week's Demand Forecast
-                | Item Name | Predicted Qty | Trend |
-                | :--- | :--- | :--- |
-                
-                ### 🛒 Smart Purchase Order (Restock)
-                | Item Name | On Hand | Predicted Need | Recommended Order |
+                ### 🔮 Scientific Sales Projection (Next 7 Days)
+                | Item Name | Daily Burn Rate | Projected 7-Day Demand | Status |
                 | :--- | :--- | :--- | :--- |
+                | [Item] | [Qty/Day] | [Qty] | [Stable/Spiking] |
+
+                ### 🛡️ Inventory Safety Audit
+                | Item Name | Current On-Hand | Safety Stock Needed | Stock-Out Day |
+                | :--- | :--- | :--- | :--- |
+                | [Item] | [Qty] | [Qty] | [e.g., Friday] |
                 
-                ### 💡 AI Strategy Tip
-                Provide one actionable tip to increase this week's profit.
+                ### 💡 Professional Business Insight
+                Provide one specific observation regarding cash flow or stock turnover.
                 
                 RULES:
+                - Do not guess. If an item has only 1 day of sales, use that as the daily rate.
                 - Output ONLY the markdown sections.
-                - Use ₹ for any price mentions.
+                - Use metric units (kg, L, Units) as per the ledger.
                 """
                 forecast_res = safe_generate(prediction_prompt)
                 
