@@ -304,37 +304,42 @@ if api_key:
         else:
             with st.spinner('AI is simulating market demand for next week...'):
                 prediction_prompt = f"""
-                You are a Retail Data Scientist. 
+                You are a Senior Supply Chain Data Scientist and Retail Coach. 
                 TODAY'S DATE: March 24, 2026.
                 
-                DATA SETS:
-                SALES HISTORY (OUT): {st.session_state['all_sales']}
-                CURRENT STOCK (IN - OUT): {st.session_state['all_inventory']}
+                DATA:
+                SALES: {st.session_state['all_sales']}
+                STOCK: {st.session_state['all_inventory']}
                 
-                METHODOLOGY:
-                1. Calculate Daily Burn Rate: For each item, find Total Sales Qty divided by the number of unique days in the sales ledger.
-                2. 7-Day Forecast: Multiply Daily Burn Rate by 7.
-                3. Safety Stock: Add 20% to the 7-Day Forecast to account for demand spikes.
-                4. Net Requirement: (7-Day Forecast + Safety Stock) - Current On-Hand Stock.
+                STRICT MATHEMATICAL INSTRUCTIONS:
+                1. Calculate Weighted Velocity (Vw): (Avg sales of last 3 days * 0.7) + (Avg sales of previous 4 days * 0.3).
+                2. Calculate Momentum Factor (M): (Avg sales of last 2 days / Avg sales of first 5 days).
+                3. Calculate Volatility Buffer (SS): If daily sales variance is > 30%, add a 40% safety stock. Otherwise, add 15%.
+                4. Projected 7-Day Demand (D7): (Vw * 7 * M) + SS.
+                5. Net Purchase Requirement: D7 - Current On-Hand Stock.
+                
+                OUTPUT RULES FOR LAYMAN:
+                - Convert these complex results into a 'Simple Shopkeeper View'.
+                - Use 'Traffic Light' Status (🔴 Critical/Out soon, 🟡 Order soon, 🟢 Healthy).
+                - Use plain English for 'Why' (e.g., 'Demand is spiking fast' or 'Stock is clearing slow').
                 
                 OUTPUT FORMAT:
-                ### 🔮 Scientific Sales Projection (Next 7 Days)
-                | Item Name | Daily Burn Rate | Projected 7-Day Demand | Status |
+                ### 🔮 Professional 7-Day Forecast & Order Guide
+                | Item Name | Status | Recommendation | Why this? |
                 | :--- | :--- | :--- | :--- |
-                | [Item] | [Qty/Day] | [Qty] | [Stable/Spiking] |
+                | [Item] | [🔴/🟡/🟢] | **[Buy Qty]** | [Reasoning in plain English] |
 
-                ### 🛡️ Inventory Safety Audit
-                | Item Name | Current On-Hand | Safety Stock Needed | Stock-Out Day |
-                | :--- | :--- | :--- | :--- |
-                | [Item] | [Qty] | [Qty] | [e.g., Friday] |
+                ### 🚦 Inventory Runway
+                - **Critical Stock-Out Alert:** [List items running out in < 48 hours]
+                - **The 'Cash-Cow' (Most Profitable Item):** [Identify highest margin/velocity item]
                 
-                ### 💡 Professional Business Insight
-                Provide one specific observation regarding cash flow or stock turnover.
+                ### 💡 AI Shop Strategy
+                Provide one 'High-Impact' retail tip (e.g., 'Bundle Sugar with Tea this week as both are trending up together').
                 
                 RULES:
-                - Do not guess. If an item has only 1 day of sales, use that as the daily rate.
+                - DO NOT show the math formulas in the output.
                 - Output ONLY the markdown sections.
-                - Use metric units (kg, L, Units) as per the ledger.
+                - If Net Purchase is < 0, recommend 0.
                 """
                 forecast_res = safe_generate(prediction_prompt)
                 
