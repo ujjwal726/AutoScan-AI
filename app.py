@@ -27,6 +27,17 @@ if user_key:
     st.sidebar.divider()
     mode = st.sidebar.radio("Select Action:", ["📈 Daily Sales (Out)", "📦 Add New Stock (In)", "📊 Inventory Dashboard"])
 
+    # --- NEW: ADMINISTRATIVE RESET SWITCH ---
+    st.sidebar.divider()
+    st.sidebar.subheader("⚠️ Administrative Actions")
+    if st.sidebar.button("🗑️ Reset All Data", help="Permanently delete all saved Stock and Sales records."):
+        st.session_state['all_sales'] = ""
+        st.session_state['all_inventory'] = ""
+        st.session_state['temp_stock'] = None
+        st.session_state['temp_sales'] = None
+        st.sidebar.success("System Reset Successful!")
+        st.rerun()
+
     if 'inventory' not in st.session_state:
         st.session_state['inventory'] = {} 
 
@@ -57,7 +68,6 @@ if user_key:
                 st.dataframe(df_stock.head())
                 stock_data_to_process = df_stock.to_string()
 
-        # STEP 1: EXTRACT & CHECK
         if st.button("🔍 Extract & Check Stock"):
             if stock_data_to_process or uploaded_stock_file:
                 with st.spinner('AI is processing inward stock...'):
@@ -80,14 +90,13 @@ if user_key:
             else:
                 st.warning("Please provide stock data first.")
 
-        # STEP 2: PREVIEW & SAVE
         if st.session_state['temp_stock']:
             st.divider()
             st.subheader("📋 Review Extracted Stock")
             st.markdown(st.session_state['temp_stock'])
             if st.button("💾 Save to Master Inventory"):
                 st.session_state['all_inventory'] += "\n" + st.session_state['temp_stock']
-                st.session_state['temp_stock'] = None # Clear waiting room
+                st.session_state['temp_stock'] = None 
                 st.success("Stock saved successfully!")
                 st.rerun()
 
@@ -117,7 +126,6 @@ if user_key:
                 st.dataframe(df_sales.head())
                 sales_data_to_process = df_sales.to_string()
 
-        # STEP 1: EXTRACT & CHECK
         if st.button("🔍 Extract & Check Sales"):
             if sales_data_to_process or uploaded_sales_file:
                 with st.spinner('AI is extracting transaction data...'):
@@ -140,7 +148,6 @@ if user_key:
             else:
                 st.warning("Please provide sales data first.")
 
-        # STEP 2: PREVIEW & SAVE
         if st.session_state['temp_sales']:
             st.divider()
             st.subheader("✅ Extracted Sales Data (Preview)")
@@ -150,46 +157,47 @@ if user_key:
                 st.session_state['temp_sales'] = None
                 st.success("Sales record saved successfully!")
                 st.rerun()
-                
-# --- MODE: DASHBOARD (Strict Template Edition) ---
+
+    # --- MODE: DASHBOARD (Enhanced Audit Edition) ---
     elif mode == "📊 Inventory Dashboard":
         st.header("📊 Real-Time Inventory & Financial Dashboard")
         
         if not st.session_state['all_inventory'] and not st.session_state['all_sales']:
             st.warning("No data found. Please add verified Stock or Sales first.")
         else:
-            with st.spinner('Calculating totals...'):
-                # FIXED TEMPLATE PROMPT
+            with st.spinner('Calculating totals and auditing records...'):
                 calculation_prompt = f"""
-                You are a Retail Accounting System. Use these ledgers:
+                You are a Senior Retail Auditor. Use these ledgers:
                 INVENTORY: {st.session_state['all_inventory']}
                 SALES: {st.session_state['all_sales']}
                 
                 OUTPUT RULES:
                 1. All monetary values must be in Rupees (₹).
-                2. Calculate: Remaining = (Sum of IN Qty) - (Sum of OUT Qty).
-                3. You MUST follow this EXACT format:
+                2. You MUST follow this EXACT format:
 
                 ### 📦 Inventory Status
                 | Item Name | Category | Total In | Total Out | Remaining | Current Value (₹) |
                 | :--- | :--- | :--- | :--- | :--- | :--- |
                 | [Item] | [Cat] | [Qty] | [Qty] | [Qty] | [₹ Total] |
 
-                ### 💰 Financial Summary
+                ### 🚩 Financial Audit & Udhari
                 - **Total Investment:** ₹[Amount]
-                - **Total Revenue:** ₹[Amount]
-                - **Cash in Hand:** ₹[Amount]
-                - **Total Udhari (Credit):** ₹[Amount]
+                - **Total Potential Revenue:** ₹[Amount]
+                - **Actual Cash in Hand:** ₹[Amount]
+                - **Total Udhari (Outstanding Credit):** ₹[Amount]
                 
-                4. Do not add any conversational text before or after the tables.
+                ### 🚀 Business Insights
+                - **Fastest Moving Item:** [Name]
+                - **Top Debtor:** [Name/Details]
+                
+                3. Do not add any conversational text before or after the tables.
                 """
                 
                 calc_response = model.generate_content(calculation_prompt)
                 
-                st.success("Calculations Updated!")
+                st.success("Analysis Complete!")
                 st.markdown(calc_response.text)
         
-        # Original Raw View for verification
         st.divider()
         with st.expander("View Raw Saved Ledgers"):
             col1, col2 = st.columns(2)
