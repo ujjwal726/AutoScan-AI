@@ -11,7 +11,7 @@ user_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
 
 if user_key:
     genai.configure(api_key=user_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-pro')
     
     # --- NEW: MEMORY INITIALIZATION (Waiting Room & Master Ledgers) ---
     if 'all_sales' not in st.session_state:
