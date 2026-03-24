@@ -1,3 +1,7 @@
 streamlit
 google-generativeai
-Pillow
+pandas
+pillow
+openai
+groq
+openpyxl
