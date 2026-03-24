@@ -151,19 +151,49 @@ if user_key:
                 st.success("Sales record saved successfully!")
                 st.rerun()
 
-    # --- MODE: DASHBOARD ---
+    # --- MODE: DASHBOARD (Updated Calculation Logic) ---
     elif mode == "📊 Inventory Dashboard":
-        st.header("Real-Time Inventory Status")
-        st.info("Displaying all verified and saved records below.")
+        st.header("📊 Real-Time Inventory & Financial Dashboard")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("📦 Master Inventory (IN)")
-            st.markdown(st.session_state['all_inventory'] if st.session_state['all_inventory'] else "No stock records saved yet.")
+        if not st.session_state['all_inventory'] and not st.session_state['all_sales']:
+            st.warning("No data found. Please add verified Stock or Sales first.")
+        else:
+            with st.spinner('AI is calculating real-time inventory levels...'):
+                # PROMPT: Send both master strings to AI for mathematical aggregation
+                calculation_prompt = f"""
+                You are a Retail Data Analyst. Use the following two ledgers to calculate current business status.
+                
+                MASTER INVENTORY (IN):
+                {st.session_state['all_inventory']}
+                
+                MASTER SALES (OUT):
+                {st.session_state['all_sales']}
+                
+                TASKS:
+                1. Group by 'Item Name' and calculate: [Total In - Total Out = Remaining Stock].
+                2. Format as a clean Markdown Table: [Item Name, Category, Total In, Total Out, Remaining Stock, Current Value].
+                3. Financial Summary:
+                   - Total Investment (Cost of all IN items).
+                   - Total Revenue (Sum of all OUT totals).
+                   - Total Cash in Hand (Sum of all CASH sales).
+                   - Total Udhari Owed (Sum of all CREDIT sales).
+                """
+                
+                calc_response = model.generate_content(calculation_prompt)
+                
+                st.success("Calculations Updated!")
+                st.markdown(calc_response.text)
         
-        with col2:
-            st.subheader("📉 Master Sales (OUT)")
-            st.markdown(st.session_state['all_sales'] if st.session_state['all_sales'] else "No sales records saved yet.")
+        # Original Raw View for verification
+        st.divider()
+        with st.expander("View Raw Saved Ledgers"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("📦 Master Inventory (IN)")
+                st.markdown(st.session_state['all_inventory'] if st.session_state['all_inventory'] else "Empty")
+            with col2:
+                st.subheader("📉 Master Sales (OUT)")
+                st.markdown(st.session_state['all_sales'] if st.session_state['all_sales'] else "Empty")
 
 else:
     st.warning("Please enter your API Key to begin.")
