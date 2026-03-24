@@ -32,10 +32,65 @@ if user_key:
             # In the next step, we will make this 'math' real.
 
     elif mode == "📈 Daily Sales (Out)":
-        st.header("Record Daily Transactions")
-        # --- EXISTING UPLOAD LOGIC ---
-        option = st.selectbox('Source:', ('Manual Entry', 'Image/PDF'))
-        uploaded_file = st.file_uploader("Upload", type=['png', 'jpg', 'jpeg'])
+        st.header("Record Daily Transactions (Sales Out)")
+        
+        # 1. Select the Input Method
+        sales_option = st.selectbox(
+            'How are you recording today\'s sales?',
+            ('Manual Text Entry', 'Image/PDF of Paper Records', 'Excel/CSV Spreadsheet')
+        )
+
+        sales_data_to_process = None
+        uploaded_sales_file = None
+
+        # 2. Handle the 3 Input Options
+        if sales_option == 'Manual Text Entry':
+            sales_data_to_process = st.text_area("Paste Sales Ledger:", height=150, placeholder="Example: Sugar 5kg, Oil 2L...")
+
+        elif sales_option == 'Image/PDF of Paper Records':
+            uploaded_sales_file = st.file_uploader("Upload photo/PDF of sales", type=['png', 'jpg', 'jpeg', 'pdf'])
+            if uploaded_sales_file:
+                st.image(uploaded_sales_file, caption="Sales Record Preview", width=300)
+                # We pass the image object directly to the AI later
+
+        elif sales_option == 'Excel/CSV Spreadsheet':
+            digital_sales_file = st.file_uploader("Upload digital sales file", type=['csv', 'xlsx'])
+            if digital_sales_file:
+                df_sales = pd.read_csv(digital_sales_file) if digital_sales_file.name.endswith('csv') else pd.read_excel(digital_sales_file)
+                st.write("Preview of Digital Sales:")
+                st.dataframe(df_sales.head())
+                sales_data_to_process = df_sales.to_string()
+
+        # 3. The Extraction Engine (The Brain)
+        if st.button("🚀 Extract & Show Sales Table"):
+            if sales_data_to_process or uploaded_sales_file:
+                with st.spinner('AI is extracting transaction data...'):
+                    sales_system_prompt = """
+                    You are a Data Extraction Specialist for a retail shop. 
+                    Convert the input into a clean Markdown Table.
+                    Columns: Date, Item Name, Category, Quantity, Unit Price, Total, Payment Type (Cash/Credit).
+                    Rules: 
+                    1. If 'Udhari' is mentioned, Payment Type is 'Credit'.
+                    2. Normalize names (e.g., 'Tel' -> 'Oil', 'Sakhar' -> 'Sugar').
+                    3. If an image is provided, perform OCR to find all line items.
+                    """
+                    
+                    # Call the AI based on what was uploaded
+                    if sales_option == 'Image/PDF of Paper Records' and uploaded_sales_file:
+                        img = Image.open(uploaded_sales_file)
+                        response = model.generate_content([sales_system_prompt, img])
+                    else:
+                        response = model.generate_content([sales_system_prompt, sales_data_to_process])
+
+                    # 4. Display the "Extracted Sales"
+                    st.divider()
+                    st.subheader("✅ Extracted Sales Data")
+                    st.markdown(response.text)
+                    
+                    # Store this in session_state so we can use it for 'Inventory Subtraction' next
+                    st.session_state['latest_sales_table'] = response.text
+            else:
+                st.warning("Please provide sales data first.")
         
         if st.button("🛠️ Process Sales & Calculate Balance"):
             # This is where we will link Sales to Inventory in Phase 7
