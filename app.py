@@ -55,10 +55,13 @@ if user_key:
             if stock_data_to_process or uploaded_stock_file:
                 with st.spinner('AI is processing inward stock...'):
                     stock_system_prompt = """
-                    You are an Inventory Manager. Extract the data into a clean Markdown Table.
-                    Columns: Item Name, Category, Quantity Added, Cost Price Per Unit, Total Cost.
-                    Rules: Normalize names (e.g., 'Sakhar' -> 'Sugar'). 
-                    Ensure 'Quantity Added' is a pure number (e.g., 50 instead of 50kg).
+                    You are an Inventory and Sales Specialist. Convert input into a Markdown Table.
+                    Columns: [Item Name, Category, Quantity, Unit Price, Total, Type, Payment Mode].
+                    Rules: 
+                    1. Normalization: Standard English names.
+                    2. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
+                    3. Type: Set to 'IN'.
+                    4. Payment Mode: Use 'CASH' or 'CREDIT' (if Udhari/Baki).
                     """
                     
                     if stock_option == 'Image/PDF of Purchase Bill' and uploaded_stock_file:
@@ -112,13 +115,13 @@ if user_key:
             if sales_data_to_process or uploaded_sales_file:
                 with st.spinner('AI is extracting transaction data...'):
                     sales_system_prompt = """
-                    You are a Data Extraction Specialist for a retail shop. 
-                    Convert the input into a clean Markdown Table.
-                    Columns: Date, Item Name, Category, Quantity, Unit Price, Total, Payment Type (Cash/Credit).
+                    You are an Inventory and Sales Specialist. Convert input into a Markdown Table.
+                    Columns: [Item Name, Category, Quantity, Unit Price, Total, Type, Payment Mode].
                     Rules: 
-                    1. If 'Udhari' is mentioned, Payment Type is 'Credit'.
-                    2. Normalize names (e.g., 'Tel' -> 'Oil', 'Sakhar' -> 'Sugar').
-                    3. If an image is provided, perform OCR to find all line items.
+                    1. Normalization: Standard English names.
+                    2. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
+                    3. Type: Set to 'OUT'.
+                    4. Payment Mode: Use 'CASH' or 'CREDIT' (if Udhari/Baki).
                     """
                     
                     # Call the AI based on what was uploaded
