@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import pandas as pd # This is for Excel/Google Sheets
+from PIL import Image
 
 st.set_page_config(page_title="AI Manager: Phase 3", layout="wide")
 st.title("🚀 Phase 3: The Universal Intake Valve")
@@ -47,10 +48,45 @@ if user_key:
                 data_to_process = df.to_string() # Turn the table into text for the AI
 
         # --- THE ACTION BUTTON ---
+        # --- THE ACTION BUTTON (The Brain) ---
         if st.button("🛠️ Orchestrate AI Analysis"):
             if data_to_process:
-                st.success(f"Source: {option} | Status: Ready for AI Processing.")
-                # Logic for Phase 4 will go here
+                with st.spinner('AI Freelancer is reading and structuring the data...'):
+                    
+                    # SYSTEM PROMPT: The "Rules of the Game" for the AI
+                    system_prompt = """
+                    You are a Data Extraction Specialist for a retail shop. 
+                    Convert the input into a clean Markdown Table.
+                    Columns: Date, Item Name, Category, Quantity, Unit Price, Total, Payment Type (Cash/Credit).
+                    Rules: 
+                    1. If 'Udhari' is mentioned, Payment Type is 'Credit'.
+                    2. Normalize names (e.g., 'Tel' -> 'Oil', 'Sakhar' -> 'Sugar').
+                    3. If an image is provided, perform OCR to find all line items.
+                    """
+
+                    try:
+                        # LOGIC: Different handling for different 'option' variables
+                        if option == 'Manual Text Entry':
+                            response = model.generate_content([system_prompt, data_to_process])
+                        
+                        elif option == 'Image/PDF of Paper Records' and uploaded_file:
+                            # We must convert the upload into a format Gemini understands
+                            img = Image.open(uploaded_file)
+                            response = model.generate_content([system_prompt, img])
+                        
+                        elif option == 'Excel/CSV Spreadsheet':
+                            response = model.generate_content([system_prompt, data_to_process])
+
+                        # DISPLAY THE RESULT
+                        st.divider()
+                        st.subheader("✅ Extracted Clean Data")
+                        st.markdown(response.text)
+                        
+                        # Store for the next phase (The Analyst)
+                        st.session_state['clean_data'] = response.text
+
+                    except Exception as ai_err:
+                        st.error(f"AI Processing Error: {ai_err}")
             else:
                 st.warning("Please provide data before analyzing.")
 
