@@ -106,7 +106,8 @@ if api_key:
 
     # --- NAVIGATION ---
     st.sidebar.divider()
-    mode = st.sidebar.radio("Select Action:", ["📈 Daily Sales (Out)", "📦 Add New Stock (In)", "📊 Inventory Dashboard"])
+    # ADDED FORECAST OPTION HERE
+    mode = st.sidebar.radio("Select Action:", ["📈 Daily Sales (Out)", "📦 Add New Stock (In)", "📊 Inventory Dashboard", "🔮 Weekly Sales Forecast"])
 
     # --- ADMINISTRATIVE RESET SWITCH ---
     st.sidebar.divider()
@@ -243,7 +244,7 @@ if api_key:
                 st.success("Sales record saved successfully!")
                 st.rerun()
 
-    # --- MODE: DASHBOARD (Enhanced Audit Edition) ---
+    # --- MODE: DASHBOARD ---
     elif mode == "📊 Inventory Dashboard":
         st.header("📊 Real-Time Inventory & Financial Dashboard")
         
@@ -293,6 +294,46 @@ if api_key:
             with col2:
                 st.subheader("📉 Master Sales (OUT)")
                 st.markdown(st.session_state['all_sales'] if st.session_state['all_sales'] else "Empty")
+
+    # --- NEW MODE: WEEKLY SALES FORECAST ---
+    elif mode == "🔮 Weekly Sales Forecast":
+        st.header("🔮 AI Sales & Inventory Forecast (Next 7 Days)")
+        
+        if not st.session_state['all_sales']:
+            st.warning("Please upload sales data first to predict the future.")
+        else:
+            with st.spinner('AI is simulating market demand for next week...'):
+                prediction_prompt = f"""
+                You are a Retail Strategy Expert. Analyze these ledgers:
+                SALES HISTORY (Last 7 Days): {st.session_state['all_sales']}
+                CURRENT STOCK: {st.session_state['all_inventory']}
+                
+                TASK:
+                1. Forecast Sales: Predict quantity for each item for the NEXT 7 days based on current velocity.
+                2. Identify Stock-Out Risks: Which items will run out before next week ends?
+                3. Purchase Recommendation: Suggest exact quantities to order today.
+                
+                OUTPUT FORMAT:
+                ### 📈 Next Week's Demand Forecast
+                | Item Name | Predicted Qty | Trend |
+                | :--- | :--- | :--- |
+                
+                ### 🛒 Smart Purchase Order (Restock)
+                | Item Name | On Hand | Predicted Need | Recommended Order |
+                | :--- | :--- | :--- | :--- |
+                
+                ### 💡 AI Strategy Tip
+                Provide one actionable tip to increase this week's profit.
+                
+                RULES:
+                - Output ONLY the markdown sections.
+                - Use ₹ for any price mentions.
+                """
+                forecast_res = safe_generate(prediction_prompt)
+                
+                if forecast_res:
+                    st.success("7-Day Forecast Ready!")
+                    st.markdown(forecast_res.text)
 
 else:
     st.warning("Please enter your API Key to begin.")
