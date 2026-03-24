@@ -1,36 +1,60 @@
 import streamlit as st
 import google.generativeai as genai
+import pandas as pd # This is for Excel/Google Sheets
 
-# Setup the page
-st.set_page_config(page_title="AI Manager: Phase 1", layout="centered")
-st.title("🚀 Phase 1: Ignition (Model 2.5 Flash)")
+st.set_page_config(page_title="AI Manager: Phase 3", layout="wide")
+st.title("🚀 Phase 3: The Universal Intake Valve")
 
-# Sidebar for the API Key
+# Sidebar for API Key
 st.sidebar.header("Settings")
 user_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
 
 if user_key:
     try:
-        # Link the key to the library
         genai.configure(api_key=user_key)
-        
-        # We specify the exact model you want: gemini-2.5-flash
         model = genai.GenerativeModel('gemini-2.5-flash')
+        st.sidebar.success("✅ Engine Online")
+
+        # --- THE UNIVERSAL INTAKE SECTION ---
+        st.write("### 📥 Select your Data Source")
         
-        # Test the connection
-        response = model.generate_content("Hello! Are you Gemini 2.5 Flash?")
-        
-        st.sidebar.success("✅ Key Validated!")
-        st.balloons()
-        
-        st.write("### System Status: Online")
-        st.success(f"Response from AI: {response.text}")
-        st.info("The 2.5 Flash engine is warmed up. Ready for the next task.")
+        # We use a 'Select Box' to keep the screen clean
+        option = st.selectbox(
+            'How would you like to upload your records?',
+            ('Manual Text Entry', 'Image/PDF of Paper Records', 'Excel/CSV Spreadsheet')
+        )
+
+        data_to_process = None
+
+        if option == 'Manual Text Entry':
+            data_to_process = st.text_area("Paste Ledger Text:", height=150)
+
+        elif option == 'Image/PDF of Paper Records':
+            # This creates a file uploader for images
+            uploaded_file = st.file_uploader("Upload a photo or PDF of your ledger", type=['png', 'jpg', 'jpeg', 'pdf'])
+            if uploaded_file:
+                st.image(uploaded_file, caption="Uploaded Record", width=300)
+                data_to_process = "FILE_UPLOADED" # We will handle the AI Vision in Phase 4
+
+        elif option == 'Excel/CSV Spreadsheet':
+            # This handles digital data
+            digital_file = st.file_uploader("Upload your Excel or CSV file", type=['csv', 'xlsx'])
+            if digital_file:
+                # 'Pandas' reads the sheet and shows it as a table
+                df = pd.read_csv(digital_file) if digital_file.name.endswith('csv') else pd.read_excel(digital_file)
+                st.write("Preview of Digital Records:")
+                st.dataframe(df.head())
+                data_to_process = df.to_string() # Turn the table into text for the AI
+
+        # --- THE ACTION BUTTON ---
+        if st.button("🛠️ Orchestrate AI Analysis"):
+            if data_to_process:
+                st.success(f"Source: {option} | Status: Ready for AI Processing.")
+                # Logic for Phase 4 will go here
+            else:
+                st.warning("Please provide data before analyzing.")
 
     except Exception as e:
-        # This will tell us EXACTLY why it failed
         st.sidebar.error(f"❌ Error: {e}")
-        st.write("### 🔍 Diagnostic Info")
-        st.write("If you see an error about 'Model not found', it might be because your key doesn't have access to 2.5 Flash yet. Check the error message in the sidebar.")
 else:
-    st.info("Waiting for API Key in the sidebar...")
+    st.info("Waiting for API Key...")
