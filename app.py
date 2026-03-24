@@ -1,19 +1,100 @@
 import streamlit as st
 import google.generativeai as genai
+from openai import OpenAI
+from groq import Groq
 import pandas as pd
 from PIL import Image
 
 st.set_page_config(page_title="End-to-End Inventory System", layout="wide")
 
-# --- AUTHENTICATION ---
+# --- 1. MULTI-PROVIDER AUTHENTICATION & DISCOVERY ---
 st.sidebar.title("🔐 System Access")
-user_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
 
-if user_key:
-    genai.configure(api_key=user_key)
-    model = genai.GenerativeModel('gemini-2.5-pro')
-    
-    # --- NEW: MEMORY INITIALIZATION (Waiting Room & Master Ledgers) ---
+# Provider Selection
+provider = st.sidebar.selectbox("🌐 Choose AI Provider:", ["Google Gemini", "Groq (Llama - High Speed)", "OpenAI (GPT)"])
+
+# Dynamic Help Notes for Users
+if provider == "Google Gemini":
+    st.sidebar.info("💡 **Note:** You need a **Google AI Studio API Key**.")
+    st.sidebar.caption("[Get Gemini Key here](https://aistudio.google.com/app/apikey)")
+elif provider == "Groq (Llama - High Speed)":
+    st.sidebar.info("💡 **Note:** Groq is 10x faster for large CSV processing.")
+    st.sidebar.caption("[Get Groq Key here](https://console.groq.com/keys)")
+elif provider == "OpenAI (GPT)":
+    st.sidebar.info("💡 **Note:** You need an **OpenAI Platform API Key**.")
+    st.sidebar.caption("[Get OpenAI Key here](https://platform.openai.com/api-keys)")
+
+api_key = st.sidebar.text_input(f"Enter {provider} API Key", type="password")
+model_instance = None
+
+if api_key:
+    # --- GOOGLE GEMINI DISCOVERY ---
+    if provider == "Google Gemini":
+        genai.configure(api_key=api_key)
+        try:
+            gemini_models = [m.name.split('/')[-1] for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            selected_model = st.sidebar.selectbox("🧠 Select Discovered Model:", gemini_models)
+            model_instance = genai.GenerativeModel(selected_model)
+        except Exception as e:
+            st.sidebar.error("❌ Invalid Gemini Key or Connection Error.")
+
+    # --- GROQ DISCOVERY ---
+    elif provider == "Groq (Llama - High Speed)":
+        client = Groq(api_key=api_key)
+        try:
+            raw_models = client.models.list()
+            groq_list = [m.id for m in raw_models.data if 'llama' in m.id or 'mixtral' in m.id]
+            selected_model = st.sidebar.selectbox("🧠 Select Discovered Model:", sorted(groq_list))
+            
+            class GroqWrapper:
+                def __init__(self, client, name): self.client, self.name = client, name
+                def generate_content(self, contents):
+                    res = self.client.chat.completions.create(model=self.name, messages=[{"role": "user", "content": str(contents)}])
+                    class Resp: 
+                        def __init__(self, t): self.text = t
+                    return Resp(res.choices[0].message.content)
+            model_instance = GroqWrapper(client, selected_model)
+        except Exception as e:
+            st.sidebar.error("❌ Invalid Groq Key or Connection Error.")
+
+    # --- OPENAI DISCOVERY ---
+    elif provider == "OpenAI (GPT)":
+        client = OpenAI(api_key=api_key)
+        try:
+            raw_models = client.models.list()
+            gpt_models = [m.id for m in raw_models if 'gpt' in m.id]
+            selected_model = st.sidebar.selectbox("🧠 Select Discovered Model:", sorted(gpt_models))
+            
+            class OpenAIWrapper:
+                def __init__(self, client, name): self.client, self.name = client, name
+                def generate_content(self, contents):
+                    res = self.client.chat.completions.create(model=self.name, messages=[{"role": "user", "content": str(contents)}])
+                    class Resp: 
+                        def __init__(self, t): self.text = t
+                    return Resp(res.choices[0].message.content)
+            model_instance = OpenAIWrapper(client, selected_model)
+        except Exception as e:
+            st.sidebar.error("❌ Invalid OpenAI Key or Connection Error.")
+
+# --- 2. THE ERROR-HANDLING WRAPPER ---
+def safe_generate(prompt_data):
+    """Executes AI call and catches Quota/Resource errors."""
+    if not model_instance:
+        st.error("Please enter a valid API Key and select a model in the sidebar.")
+        return None
+    try:
+        return model_instance.generate_content(prompt_data)
+    except Exception as e:
+        err_msg = str(e).lower()
+        if any(x in err_msg for x in ["429", "resource_exhausted", "insufficient_quota", "rate_limit"]):
+            st.error("🚨 **API Limit Reached!**")
+            st.warning("Please switch to another model or provider in the sidebar.")
+        else:
+            st.error(f"⚠️ AI Connection Error: {e}")
+        return None
+
+if api_key:
+    # --- MEMORY INITIALIZATION ---
     if 'all_sales' not in st.session_state:
         st.session_state['all_sales'] = "" 
     if 'all_inventory' not in st.session_state:
@@ -27,7 +108,7 @@ if user_key:
     st.sidebar.divider()
     mode = st.sidebar.radio("Select Action:", ["📈 Daily Sales (Out)", "📦 Add New Stock (In)", "📊 Inventory Dashboard"])
 
-    # --- NEW: ADMINISTRATIVE RESET SWITCH ---
+    # --- ADMINISTRATIVE RESET SWITCH ---
     st.sidebar.divider()
     st.sidebar.subheader("⚠️ Administrative Actions")
     if st.sidebar.button("🗑️ Reset All Data", help="Permanently delete all saved Stock and Sales records."):
@@ -82,11 +163,12 @@ if user_key:
                     """
                     if stock_option == 'Image/PDF of Purchase Bill' and uploaded_stock_file:
                         img = Image.open(uploaded_stock_file)
-                        response = model.generate_content([stock_system_prompt, img])
+                        response = safe_generate([stock_system_prompt, img])
                     else:
-                        response = model.generate_content([stock_system_prompt, stock_data_to_process])
+                        response = safe_generate([stock_system_prompt, stock_data_to_process])
                     
-                    st.session_state['temp_stock'] = response.text
+                    if response:
+                        st.session_state['temp_stock'] = response.text
             else:
                 st.warning("Please provide stock data first.")
 
@@ -140,11 +222,12 @@ if user_key:
                     """
                     if sales_option == 'Image/PDF of Paper Records' and uploaded_sales_file:
                         img = Image.open(uploaded_sales_file)
-                        response = model.generate_content([sales_system_prompt, img])
+                        response = safe_generate([sales_system_prompt, img])
                     else:
-                        response = model.generate_content([sales_system_prompt, sales_data_to_process])
+                        response = safe_generate([sales_system_prompt, sales_data_to_process])
                     
-                    st.session_state['temp_sales'] = response.text
+                    if response:
+                        st.session_state['temp_sales'] = response.text
             else:
                 st.warning("Please provide sales data first.")
 
@@ -193,10 +276,11 @@ if user_key:
                 3. Do not add any conversational text before or after the tables.
                 """
                 
-                calc_response = model.generate_content(calculation_prompt)
+                calc_response = safe_generate(calculation_prompt)
                 
-                st.success("Analysis Complete!")
-                st.markdown(calc_response.text)
+                if calc_response:
+                    st.success("Analysis Complete!")
+                    st.markdown(calc_response.text)
         
         st.divider()
         with st.expander("View Raw Saved Ledgers"):
