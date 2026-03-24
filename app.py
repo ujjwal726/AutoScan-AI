@@ -20,16 +20,62 @@ if user_key:
     # We use 'session_state' to keep a simple 'database' in memory for today
     if 'inventory' not in st.session_state:
         st.session_state['inventory'] = {} # Format: {"Item": Quantity}
-
     if mode == "📦 Add New Stock (In)":
-        st.header("Add Inventory to Warehouse")
-        stock_input = st.text_area("List items purchased (e.g., 'Bought 50kg Sugar @ 38/kg')")
-        if st.button("Update Stock Baseline"):
-            # AI Task: Extract Item and Qty and add to session_state
-            prompt = f"Extract items and quantities as a Python dictionary from: {stock_input}. Return ONLY the dictionary."
-            res = model.generate_content(prompt)
-            st.success(f"Stock Updated! Raw Data: {res.text}")
-            # In the next step, we will make this 'math' real.
+        st.header("📦 Inventory Intake (Stock-In)")
+        st.info("Record new purchases or initial stock levels here.")
+
+        # 1. Select the Input Method for Stock
+        stock_option = st.selectbox(
+            'How are you recording this stock?',
+            ('Manual Text Entry', 'Image/PDF of Purchase Bill', 'Excel/CSV Stock Sheet')
+        )
+
+        stock_data_to_process = None
+        uploaded_stock_file = None
+
+        # 2. Handle the 3 Input Options
+        if stock_option == 'Manual Text Entry':
+            stock_data_to_process = st.text_area("List Items Purchased:", height=150, placeholder="Example: Bought 100kg Sugar at 40/kg, 50L Oil at 140/L...")
+
+        elif stock_option == 'Image/PDF of Purchase Bill':
+            uploaded_stock_file = st.file_uploader("Upload Bill/Invoice Photo", type=['png', 'jpg', 'jpeg', 'pdf'])
+            if uploaded_stock_file:
+                st.image(uploaded_stock_file, caption="Inward Bill Preview", width=300)
+
+        elif stock_option == 'Excel/CSV Stock Sheet':
+            digital_stock_file = st.file_uploader("Upload Stock Spreadsheet", type=['csv', 'xlsx'])
+            if digital_stock_file:
+                df_stock = pd.read_csv(digital_stock_file) if digital_stock_file.name.endswith('csv') else pd.read_excel(digital_stock_file)
+                st.write("Preview of Digital Stock:")
+                st.dataframe(df_stock.head())
+                stock_data_to_process = df_stock.to_string()
+
+        # 3. The Extraction Engine for Stock
+        if st.button("📥 Update Warehouse Stock"):
+            if stock_data_to_process or uploaded_stock_file:
+                with st.spinner('AI is processing inward stock...'):
+                    stock_system_prompt = """
+                    You are an Inventory Manager. Extract the data into a clean Markdown Table.
+                    Columns: Item Name, Category, Quantity Added, Cost Price Per Unit, Total Cost.
+                    Rules: Normalize names (e.g., 'Sakhar' -> 'Sugar'). 
+                    Ensure 'Quantity Added' is a pure number (e.g., 50 instead of 50kg).
+                    """
+                    
+                    if stock_option == 'Image/PDF of Purchase Bill' and uploaded_stock_file:
+                        img = Image.open(uploaded_stock_file)
+                        response = model.generate_content([stock_system_prompt, img])
+                    else:
+                        response = model.generate_content([stock_system_prompt, stock_data_to_process])
+
+                    # 4. Display the "Extracted Stock"
+                    st.divider()
+                    st.subheader("✅ New Stock Added to Records")
+                    st.markdown(response.text)
+                    
+                    # Store this in session_state for the 'Inventory Dashboard'
+                    st.session_state['latest_stock_added'] = response.text
+            else:
+                st.warning("Please provide stock data first.")
 
     elif mode == "📈 Daily Sales (Out)":
         st.header("Record Daily Transactions (Sales Out)")
