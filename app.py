@@ -152,14 +152,15 @@ if api_key:
         if st.button("🔍 Extract & Check Stock"):
             if stock_data_to_process or uploaded_stock_file:
                 with st.spinner('AI is processing inward stock...'):
-                    stock_system_prompt = """
-                    You are an Inventory and Sales Specialist. Convert input into a Markdown Table.
-                    Columns: [Item Name, Category, Quantity, Unit Price, Total, Type, Payment Mode].
-                    Rules: 
-                    1. Normalization: Standard English names.
-                    2. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
-                    3. Type: Set to 'IN'.
-                    4. Payment Mode: Use 'CASH' or 'CREDIT' (if Udhari/Baki).
+                    stock_system_prompt = """You are an Inventory Specialist. Convert input into a Markdown Table.
+                    Columns: [Date, Item Name, Category, Quantity, Unit Price, Total, Type, Payment Mode].
+
+                    RULES:
+                    1. Output ONLY the markdown table. 
+                    2. DO NOT include any introductory text, explanations, or Python code blocks.
+                    3. Normalization: Standard English names.
+                    4. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
+                    5. Type: Set to 'IN'
                     """
                     if stock_option == 'Image/PDF of Purchase Bill' and uploaded_stock_file:
                         img = Image.open(uploaded_stock_file)
@@ -211,14 +212,15 @@ if api_key:
         if st.button("🔍 Extract & Check Sales"):
             if sales_data_to_process or uploaded_sales_file:
                 with st.spinner('AI is extracting transaction data...'):
-                    sales_system_prompt = """
-                    You are an Inventory and Sales Specialist. Convert input into a Markdown Table.
-                    Columns: [Item Name, Category, Quantity, Unit Price, Total, Type, Payment Mode].
-                    Rules: 
-                    1. Normalization: Standard English names.
-                    2. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
-                    3. Type: Set to 'OUT'.
-                    4. Payment Mode: Use 'CASH' or 'CREDIT' (if Udhari/Baki).
+                    sales_system_prompt = """You are a Sales Specialist. Convert input into a Markdown Table.
+                    Columns: [Date, Item Name, Category, Quantity, Unit Price, Total, Type, Payment Mode].
+
+                    RULES:
+                    1. Output ONLY the markdown table. 
+                    2. DO NOT include any introductory text, explanations, or Python code blocks.
+                    3. Normalization: Standard English names.
+                    4. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
+                    5. Type: Set to 'OUT'
                     """
                     if sales_option == 'Image/PDF of Paper Records' and uploaded_sales_file:
                         img = Image.open(uploaded_sales_file)
