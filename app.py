@@ -492,12 +492,11 @@ if api_key:
 
     # --- MODE: WEEKLY SALES FORECAST (THE AGENT) ---
     elif mode == "🔮 Weekly Sales Forecast":
-        st.header("🤖 AI Supply Chain Agent")
+        st.header("🔮 Smart Sales Forecast & Restock Agent")
+        st.info("📊 Mathematical forecast generated instantly (Zero API Cost).")
         
-        # --- NEW: MEMORY FOR THE FORECAST ---
-        # This tells the app to remember the last AI response so we don't call the API twice
-        if 'latest_forecast' not in st.session_state:
-            st.session_state['latest_forecast'] = None
+        if 'latest_email' not in st.session_state:
+            st.session_state['latest_email'] = None
             
         import sqlite3
         import pandas as pd
@@ -510,33 +509,58 @@ if api_key:
         if df_inventory.empty or df_sales.empty:
             st.warning("Please add both stock and sales data to run the AI Agent.")
         else:
-            # 1. Python does the exact math instantly (This is FREE and FAST)
-            in_summary = df_inventory.groupby('item_name')['quantity'].sum().reset_index()
-            in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
+            with st.spinner("Calculating Kirana Intuition Math..."):
+                # 1. Total Inventory In
+                in_summary = df_inventory.groupby('item_name')['quantity'].sum().reset_index()
+                in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
+                
+                # 2. Advanced Sales Math (Recency Bias)
+                df_sales['date'] = pd.to_datetime(df_sales['date'])
+                latest_date = df_sales['date'].max()
+                cutoff_date = latest_date - pd.Timedelta(days=7)
+                
+                # Get total out AND last 7 days out
+                out_total = df_sales.groupby('item_name')['quantity'].sum().reset_index()
+                out_recent = df_sales[df_sales['date'] >= cutoff_date].groupby('item_name')['quantity'].sum().reset_index()
+                
+                # Merge sales stats
+                sales_stats = pd.merge(out_total, out_recent, on='item_name', how='left', suffixes=('_total', '_7d')).fillna(0)
+                
+                # 3. The "Kirana Intuition" Formula
+                # Velocity = (70% weight to recent week) + (30% weight to older history)
+                sales_stats['hist_vel'] = (sales_stats['quantity_total'] - sales_stats['quantity_7d']) / 23 # approx 23 older days
+                sales_stats['recent_vel'] = sales_stats['quantity_7d'] / 7
+                
+                sales_stats['Blended_Daily_Velocity'] = (sales_stats['recent_vel'] * 0.70) + (sales_stats['hist_vel'] * 0.30)
+                
+                # Next 7 Days Demand + 15% Safety Stock
+                sales_stats['Projected_7D_Demand'] = (sales_stats['Blended_Daily_Velocity'] * 7 * 1.15).round(0)
+                
+                # 4. Merge with Inventory to find what to order
+                df_agent = pd.merge(in_summary, sales_stats, on='item_name', how='left').fillna(0)
+                df_agent['Remaining_Stock'] = df_agent['Total_In'] - df_agent['quantity_total']
+                df_agent['Suggested_Order_Qty'] = df_agent['Projected_7D_Demand'] - df_agent['Remaining_Stock']
+                df_agent['Suggested_Order_Qty'] = df_agent['Suggested_Order_Qty'].clip(lower=0) # No negative orders
+                
+                # 5. Format a beautiful table for the user to see instantly
+                display_df = df_agent[['item_name', 'Remaining_Stock', 'Projected_7D_Demand', 'Suggested_Order_Qty']].copy()
+                display_df.columns = ['Item Name', 'Current Stock', 'Expected Demand (Next 7D)', 'Qty to Order']
+                
+            # --- THE TRANSPARENT UI ---
+            st.subheader("📋 Data-Driven Restock Recommendation")
+            st.dataframe(display_df, use_container_width=True)
             
-            out_summary = df_sales.groupby('item_name')['quantity'].sum().reset_index()
-            out_summary.rename(columns={'quantity': 'Total_Out'}, inplace=True)
+            items_to_order = display_df[display_df['Qty to Order'] > 0]
             
-            df_agent = pd.merge(in_summary, out_summary, on='item_name', how='left').fillna(0)
-            df_agent['Remaining_Stock'] = df_agent['Total_In'] - df_agent['Total_Out']
+            st.divider()
+            st.subheader("🤖 AI Communication Agent")
+            st.caption("Let the AI draft emails to your suppliers based on the table above.")
             
-            total_days_active = df_sales['date'].nunique() if not df_sales.empty and df_sales['date'].nunique() > 0 else 1 
-            df_agent['Daily_Velocity'] = df_agent['Total_Out'] / total_days_active
-            df_agent['Projected_7D_Demand'] = (df_agent['Daily_Velocity'] * 7 * 1.2).round(0)
-            
-            df_agent['Suggested_Order_Qty'] = df_agent['Projected_7D_Demand'] - df_agent['Remaining_Stock']
-            df_agent['Suggested_Order_Qty'] = df_agent['Suggested_Order_Qty'].clip(lower=0)
-            
-            items_to_order = df_agent[df_agent['Suggested_Order_Qty'] > 0]
-            
-            # --- NEW: THE USER INTERFACE ---
-            st.info("💡 Python has analyzed your database. Click below to draft supplier emails.")
-            
-            # This button protects our API!
-            if st.button("🚀 Generate AI Restock Alert (Costs API Credits)"):
-                with st.spinner('Agent is drafting emails to your suppliers...'):
+            # The API is gated behind this button!
+            if st.button("🚀 Draft Supplier Emails (Uses AI)"):
+                with st.spinner('Agent is drafting emails...'):
                     try:
-                        exact_data_str = items_to_order[['item_name', 'Remaining_Stock', 'Suggested_Order_Qty']].to_string(index=False)
+                        exact_data_str = items_to_order.to_string(index=False)
                         
                         agent_prompt = f"""
                         You are an Autonomous Supply Chain Agent. 
@@ -547,34 +571,27 @@ if api_key:
                         
                         YOUR MISSION:
                         1. If the data says "NO ITEMS NEED REORDERING", simply output: "🟢 Stock levels are healthy. No orders needed."
-                        2. If there is data, output a markdown report with exactly two sections:
+                        2. If there is data, output ONLY a markdown report with this section:
                            
-                           ### 🚨 Smart Restock Alert
-                           (List the items and the exact 'Suggested_Order_Qty' we need to buy.)
-                           
-                           ### 📧 Automated Purchase Order Draft
-                           (Write a professional email/WhatsApp template to the supplier to place the order for these EXACT quantities. Leave [Blank] for the supplier's name).
+                           ### 📧 Automated Purchase Order Drafts
+                           (Write professional email/WhatsApp templates to the suppliers to place the order for these EXACT quantities. You can group items logically if you want. Leave [Blank] for the supplier names).
                         
                         RULES:
-                        - NEVER change the Suggested_Order_Qty numbers. Use them exactly as provided.
+                        - NEVER change the 'Qty to Order' numbers.
+                        - Do not explain the math, just write the emails.
                         """
                         
                         agent_response = safe_generate(agent_prompt)
                         
                         if agent_response:
-                            # Save the new response into the app's memory
-                            st.session_state['latest_forecast'] = agent_response.text
-                            st.success("✅ New Agent Analysis Generated!")
+                            st.session_state['latest_email'] = agent_response.text
+                            st.success("✅ Emails Drafted!")
                             
                     except Exception as e:
                         st.error(f"❌ Agent encountered an error: {e}")
 
-            # --- DISPLAY THE SAVED FORECAST ---
-            # This will show up automatically if we have an old forecast saved, 
-            # OR right after we generate a new one.
-            if st.session_state['latest_forecast']:
-                st.divider()
-                st.markdown(st.session_state['latest_forecast'])
+            if st.session_state['latest_email']:
+                st.markdown(st.session_state['latest_email'])
 
 else:
     st.warning("Please enter your API Key to begin.")
