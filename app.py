@@ -493,12 +493,15 @@ if api_key:
     # --- MODE: WEEKLY SALES FORECAST (THE AGENT) ---
     elif mode == "🔮 Weekly Sales Forecast":
         st.header("🤖 AI Supply Chain Agent")
-        st.info("The Agent uses exact database numbers to determine what to reorder.")
         
+        # --- NEW: MEMORY FOR THE FORECAST ---
+        # This tells the app to remember the last AI response so we don't call the API twice
+        if 'latest_forecast' not in st.session_state:
+            st.session_state['latest_forecast'] = None
+            
         import sqlite3
         import pandas as pd
         
-        # 1. Connect to DB and get data
         conn = sqlite3.connect('shop_data.db')
         df_inventory = pd.read_sql_query("SELECT * FROM inventory", conn)
         df_sales = pd.read_sql_query("SELECT * FROM sales", conn)
@@ -507,71 +510,71 @@ if api_key:
         if df_inventory.empty or df_sales.empty:
             st.warning("Please add both stock and sales data to run the AI Agent.")
         else:
-            with st.spinner('Agent is analyzing accurate database metrics...'):
-                try:
-                    # 1. Exact Math for Current Stock
-                    in_summary = df_inventory.groupby('item_name')['quantity'].sum().reset_index()
-                    in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
-                    
-                    out_summary = df_sales.groupby('item_name')['quantity'].sum().reset_index()
-                    out_summary.rename(columns={'quantity': 'Total_Out'}, inplace=True)
-                    
-                    df_agent = pd.merge(in_summary, out_summary, on='item_name', how='left').fillna(0)
-                    df_agent['Remaining_Stock'] = df_agent['Total_In'] - df_agent['Total_Out']
-                    
-                    # --- NEW: DETERMINISTIC FORECASTING MATH ---
-                    # MVP Logic: We calculate average daily velocity based on total days recorded, 
-                    # then multiply by 7 for next week's demand, adding a 20% safety buffer.
-                    
-                    # Fallback to 1 if empty to avoid division by zero
-                    total_days_active = df_sales['date'].nunique() if not df_sales.empty and df_sales['date'].nunique() > 0 else 1 
-                    
-                    df_agent['Daily_Velocity'] = df_agent['Total_Out'] / total_days_active
-                    df_agent['Projected_7D_Demand'] = (df_agent['Daily_Velocity'] * 7 * 1.2).round(0) # 1.2 is a 20% safety buffer
-                    
-                    # Calculate exactly what needs to be ordered
-                    df_agent['Suggested_Order_Qty'] = df_agent['Projected_7D_Demand'] - df_agent['Remaining_Stock']
-                    
-                    # If we have enough stock (negative order), force it to 0
-                    df_agent['Suggested_Order_Qty'] = df_agent['Suggested_Order_Qty'].clip(lower=0)
-                    
-                    # Filter to ONLY items that actually need ordering
-                    items_to_order = df_agent[df_agent['Suggested_Order_Qty'] > 0]
-                    
-                    # 2. Convert to string for the AI
-                    exact_data_str = items_to_order[['item_name', 'Remaining_Stock', 'Suggested_Order_Qty']].to_string(index=False)
-                    
-                    # 3. The Agentic Prompt
-                    agent_prompt = f"""
-                    You are an Autonomous Supply Chain Agent. 
-                    Our backend Python engine has calculated exactly what needs to be ordered for the next 7 days to prevent stock-outs.
-                    
-                    CRITICAL REORDER DATA:
-                    {exact_data_str if not items_to_order.empty else "NO ITEMS NEED REORDERING."}
-                    
-                    YOUR MISSION:
-                    1. If the data says "NO ITEMS NEED REORDERING", simply output: "🟢 Stock levels are healthy for the next 7 days. No orders needed."
-                    2. If there is data, output a markdown report with exactly two sections:
-                       
-                       ### 🚨 Smart Restock Alert
-                       (List the items and the exact 'Suggested_Order_Qty' we need to buy. Keep it brief.)
-                       
-                       ### 📧 Automated Purchase Order Draft
-                       (Write a professional email/WhatsApp template to the supplier to place the order for these EXACT quantities. Leave [Blank] for the supplier's name).
-                    
-                    RULES:
-                    - NEVER change the Suggested_Order_Qty numbers. Use them exactly as provided.
-                    """
-                    
-                    # 4. Execute the AI call
-                    agent_response = safe_generate(agent_prompt)
-                    
-                    if agent_response:
-                        st.success("✅ Agent Forecasting & Analysis Complete!")
-                        st.markdown(agent_response.text)
-                
-                except Exception as e:
-                    st.error(f"❌ Agent encountered an error: {e}")
+            # 1. Python does the exact math instantly (This is FREE and FAST)
+            in_summary = df_inventory.groupby('item_name')['quantity'].sum().reset_index()
+            in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
+            
+            out_summary = df_sales.groupby('item_name')['quantity'].sum().reset_index()
+            out_summary.rename(columns={'quantity': 'Total_Out'}, inplace=True)
+            
+            df_agent = pd.merge(in_summary, out_summary, on='item_name', how='left').fillna(0)
+            df_agent['Remaining_Stock'] = df_agent['Total_In'] - df_agent['Total_Out']
+            
+            total_days_active = df_sales['date'].nunique() if not df_sales.empty and df_sales['date'].nunique() > 0 else 1 
+            df_agent['Daily_Velocity'] = df_agent['Total_Out'] / total_days_active
+            df_agent['Projected_7D_Demand'] = (df_agent['Daily_Velocity'] * 7 * 1.2).round(0)
+            
+            df_agent['Suggested_Order_Qty'] = df_agent['Projected_7D_Demand'] - df_agent['Remaining_Stock']
+            df_agent['Suggested_Order_Qty'] = df_agent['Suggested_Order_Qty'].clip(lower=0)
+            
+            items_to_order = df_agent[df_agent['Suggested_Order_Qty'] > 0]
+            
+            # --- NEW: THE USER INTERFACE ---
+            st.info("💡 Python has analyzed your database. Click below to draft supplier emails.")
+            
+            # This button protects our API!
+            if st.button("🚀 Generate AI Restock Alert (Costs API Credits)"):
+                with st.spinner('Agent is drafting emails to your suppliers...'):
+                    try:
+                        exact_data_str = items_to_order[['item_name', 'Remaining_Stock', 'Suggested_Order_Qty']].to_string(index=False)
+                        
+                        agent_prompt = f"""
+                        You are an Autonomous Supply Chain Agent. 
+                        Our backend Python engine has calculated exactly what needs to be ordered for the next 7 days.
+                        
+                        CRITICAL REORDER DATA:
+                        {exact_data_str if not items_to_order.empty else "NO ITEMS NEED REORDERING."}
+                        
+                        YOUR MISSION:
+                        1. If the data says "NO ITEMS NEED REORDERING", simply output: "🟢 Stock levels are healthy. No orders needed."
+                        2. If there is data, output a markdown report with exactly two sections:
+                           
+                           ### 🚨 Smart Restock Alert
+                           (List the items and the exact 'Suggested_Order_Qty' we need to buy.)
+                           
+                           ### 📧 Automated Purchase Order Draft
+                           (Write a professional email/WhatsApp template to the supplier to place the order for these EXACT quantities. Leave [Blank] for the supplier's name).
+                        
+                        RULES:
+                        - NEVER change the Suggested_Order_Qty numbers. Use them exactly as provided.
+                        """
+                        
+                        agent_response = safe_generate(agent_prompt)
+                        
+                        if agent_response:
+                            # Save the new response into the app's memory
+                            st.session_state['latest_forecast'] = agent_response.text
+                            st.success("✅ New Agent Analysis Generated!")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Agent encountered an error: {e}")
+
+            # --- DISPLAY THE SAVED FORECAST ---
+            # This will show up automatically if we have an old forecast saved, 
+            # OR right after we generate a new one.
+            if st.session_state['latest_forecast']:
+                st.divider()
+                st.markdown(st.session_state['latest_forecast'])
 
 else:
     st.warning("Please enter your API Key to begin.")
