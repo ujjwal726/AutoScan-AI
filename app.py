@@ -409,11 +409,20 @@ if api_key:
                 total_investment = df_inventory['total'].sum()
                 total_revenue = df_sales['total'].sum() if not df_sales.empty else 0
                 
+                # --- NEW: CALCULATE UDHARI (CREDIT) ---
+                total_credit = 0
+                if not df_sales.empty:
+                    # Filter for 'credit' or 'udhari' (case-insensitive search)
+                    credit_mask = df_sales['payment_mode'].str.contains('credit|udhari', case=False, na=False)
+                    total_credit = df_sales.loc[credit_mask, 'total'].sum()
+                
                 # Streamlit metrics are great for high-level KPIs
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Total Investment", f"₹{total_investment:,.2f}")
                 col2.metric("Total Revenue", f"₹{total_revenue:,.2f}")
                 col3.metric("Current Balance", f"₹{(total_revenue - total_investment):,.2f}")
+                # Show Udhari in red!
+                col4.metric("🚨 Pending Udhari", f"₹{total_credit:,.2f}")
 
         except Exception as e:
             st.error(f"❌ Error loading dashboard: {e}")
@@ -437,7 +446,7 @@ if api_key:
         else:
             with st.spinner('Agent is analyzing accurate database metrics...'):
                 try:
-                    # 2. Python does the exact math to figure out what is left
+                    # 1. Exact Math for Current Stock
                     in_summary = df_inventory.groupby('item_name')['quantity'].sum().reset_index()
                     in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
                     
@@ -447,37 +456,55 @@ if api_key:
                     df_agent = pd.merge(in_summary, out_summary, on='item_name', how='left').fillna(0)
                     df_agent['Remaining_Stock'] = df_agent['Total_In'] - df_agent['Total_Out']
                     
-                    # 3. Convert the exact math into a string the AI can read
-                    exact_data_str = df_agent.to_string(index=False)
+                    # --- NEW: DETERMINISTIC FORECASTING MATH ---
+                    # MVP Logic: We calculate average daily velocity based on total days recorded, 
+                    # then multiply by 7 for next week's demand, adding a 20% safety buffer.
                     
-                    # 4. The Agentic Prompt: We give it facts, it gives us actions
+                    # Fallback to 1 if empty to avoid division by zero
+                    total_days_active = df_sales['date'].nunique() if not df_sales.empty and df_sales['date'].nunique() > 0 else 1 
+                    
+                    df_agent['Daily_Velocity'] = df_agent['Total_Out'] / total_days_active
+                    df_agent['Projected_7D_Demand'] = (df_agent['Daily_Velocity'] * 7 * 1.2).round(0) # 1.2 is a 20% safety buffer
+                    
+                    # Calculate exactly what needs to be ordered
+                    df_agent['Suggested_Order_Qty'] = df_agent['Projected_7D_Demand'] - df_agent['Remaining_Stock']
+                    
+                    # If we have enough stock (negative order), force it to 0
+                    df_agent['Suggested_Order_Qty'] = df_agent['Suggested_Order_Qty'].clip(lower=0)
+                    
+                    # Filter to ONLY items that actually need ordering
+                    items_to_order = df_agent[df_agent['Suggested_Order_Qty'] > 0]
+                    
+                    # 2. Convert to string for the AI
+                    exact_data_str = items_to_order[['item_name', 'Remaining_Stock', 'Suggested_Order_Qty']].to_string(index=False)
+                    
+                    # 3. The Agentic Prompt
                     agent_prompt = f"""
-                    You are an Autonomous Supply Chain Agent for a retail shop. 
-                    Here is the 100% accurate current inventory data calculated by our backend system:
+                    You are an Autonomous Supply Chain Agent. 
+                    Our backend Python engine has calculated exactly what needs to be ordered for the next 7 days to prevent stock-outs.
                     
-                    {exact_data_str}
+                    CRITICAL REORDER DATA:
+                    {exact_data_str if not items_to_order.empty else "NO ITEMS NEED REORDERING."}
                     
                     YOUR MISSION:
-                    1. Analyze the 'Remaining_Stock' vs 'Total_Out'.
-                    2. Identify which items are critically low or out of stock.
-                    3. Output a markdown report with exactly two sections:
+                    1. If the data says "NO ITEMS NEED REORDERING", simply output: "🟢 Stock levels are healthy for the next 7 days. No orders needed."
+                    2. If there is data, output a markdown report with exactly two sections:
                        
-                       ### 🚨 Restock Intelligence
-                       (Briefly explain what items need to be ordered and why, based ONLY on the data provided).
+                       ### 🚨 Smart Restock Alert
+                       (List the items and the exact 'Suggested_Order_Qty' we need to buy. Keep it brief.)
                        
-                       ### 📧 Automated Supplier Email Draft
-                       (Write a professional email template to the supplier requesting new stock for ONLY the critical items. Leave [Blank] for the supplier's name).
+                       ### 📧 Automated Purchase Order Draft
+                       (Write a professional email/WhatsApp template to the supplier to place the order for these EXACT quantities. Leave [Blank] for the supplier's name).
                     
                     RULES:
-                    - Do NOT hallucinate numbers. Use only the exact numbers provided in the data.
-                    - Do NOT output any conversational text outside of the two markdown sections.
+                    - NEVER change the Suggested_Order_Qty numbers. Use them exactly as provided.
                     """
                     
-                    # 5. Execute the AI call
+                    # 4. Execute the AI call
                     agent_response = safe_generate(agent_prompt)
                     
                     if agent_response:
-                        st.success("✅ Agent Analysis Complete!")
+                        st.success("✅ Agent Forecasting & Analysis Complete!")
                         st.markdown(agent_response.text)
                 
                 except Exception as e:
