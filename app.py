@@ -276,6 +276,53 @@ if api_key:
                 st.rerun() # Refresh the screen to show the new data
             except Exception as e:
                 st.sidebar.error(f"Error running simulation: {e}")
+    # --- NEW: SUPPLIER SIMULATION BUTTON ---
+    if st.sidebar.button("🏭 Generate Fake Rate Cards", help="Injects 5 rival suppliers for testing."):
+        import random
+        import sqlite3
+
+        with st.spinner("Generating rival supplier data..."):
+            try:
+                conn = sqlite3.connect('shop_data.db')
+                c = conn.cursor()
+                
+                # Wipe old supplier data so we start fresh
+                c.execute("DELETE FROM suppliers")
+                
+                # Our standard Kirana catalog (Base Prices)
+                catalog = [
+                    ("Aashirvaad Atta 5kg", 180), ("Fortune Sunflower Oil 1L", 110),
+                    ("Tata Salt 1kg", 18), ("Maggi 140g", 22),
+                    ("Surf Excel Matic 1kg", 170), ("Amul Butter 100g", 45),
+                    ("Parle-G 250g", 20), ("Red Label Tea 250g", 120),
+                    ("Sugar 1kg", 38), ("Lifebuoy Soap", 25)
+                ]
+                
+                # 5 Rival Suppliers (Name, Distance, Min Multiplier, Max Multiplier)
+                suppliers_list = [
+                    ("Raju Traders", 3.0, 0.98, 1.05),
+                    ("Metro Cash & Carry", 12.0, 0.92, 0.99), # Generally cheaper, but far
+                    ("Gupta Wholesale", 1.5, 0.99, 1.08),     # Close, but expensive
+                    ("Udaan B2B", 8.0, 0.95, 1.02),
+                    ("Local Mandi", 5.0, 0.90, 1.00)          # Wildcard pricing
+                ]
+                
+                # Generate the prices!
+                for item_name, base_price in catalog:
+                    for sup_name, dist, min_var, max_var in suppliers_list:
+                        # Calculate a realistic, slightly randomized price
+                        sup_price = round(base_price * random.uniform(min_var, max_var), 2)
+                        
+                        c.execute('''INSERT INTO suppliers (supplier_name, item_name, price_per_unit, distance_km, contact_info) 
+                                     VALUES (?, ?, ?, ?, ?)''', 
+                                  (sup_name, item_name, sup_price, dist, f"orders@{sup_name.replace(' ', '').lower()}.in"))
+                                  
+                conn.commit()
+                conn.close()
+                st.sidebar.success("✅ 5 Fake Rate Cards Injected!")
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Error generating suppliers: {e}")        
 
     # --- MODE: STOCK IN ---
     if mode == "📦 Add New Stock (In)":
