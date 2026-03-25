@@ -769,30 +769,50 @@ if api_key:
             df_suppliers = pd.read_sql_query("SELECT * FROM suppliers", conn)
             conn.close()
 
+            # --- 6. PROCUREMENT DASHBOARD ---
+        st.divider()
+        st.header("🏆 Procurement Dashboard")
+
+        try:
+            import pandas as pd
+            import sqlite3
+
+            # 1. Read the saved data from the database
+            conn = sqlite3.connect('shop_data.db')
+            df_suppliers = pd.read_sql_query("SELECT * FROM suppliers", conn)
+            conn.close()
+
             # 2. Display the Dashboard if we have data
             if not df_suppliers.empty:
-                st.subheader("📊 Price Comparison Matrix")
-                st.caption("Green highlights the cheapest rate for each item.")
+                st.subheader("📊 Price Comparison Matrix (Base Price)")
+                st.caption("Green highlights the cheapest RAW rate for each item (ignoring transport).")
                 
-                # Create a table comparing all suppliers side-by-side
+                # Create a table comparing all base prices
                 pivot_df = df_suppliers.pivot_table(index='item_name', columns='supplier_name', values='price_per_unit', aggfunc='min')
                 st.dataframe(pivot_df.style.highlight_min(axis=1, color='lightgreen'), use_container_width=True)
 
                 st.divider()
-                st.subheader("📦 Smart Order List (Cheapest Options)")
-                st.info("Here is exactly what you should buy from each supplier to save the most money.")
+                st.subheader("📦 Smart Order List (Optimized by Landed Cost)")
+                st.info("Here is the TRUE cheapest supplier for each item when transport costs are included.")
                 
-                # Find the absolute lowest price for each item using Python math
-                cheapest_items = df_suppliers.loc[df_suppliers.groupby('item_name')['price_per_unit'].idxmin()]
+                # --- THE MATHEMATICAL UPGRADE: LANDED COST ---
+                t_rate = st.session_state.get('transport_rate', 2.0)
+                df_suppliers['landed_cost'] = df_suppliers['price_per_unit'] + (df_suppliers['distance_km'] * t_rate)
+                
+                # Find the absolute lowest TRUE price for each item using the new math
+                cheapest_items = df_suppliers.loc[df_suppliers.groupby('item_name')['landed_cost'].idxmin()]
                 
                 # Group those winning items by the supplier
                 grouped_orders = cheapest_items.groupby('supplier_name')
 
                 # Display a clean list for each supplier
                 for supplier, items in grouped_orders:
-                    with st.expander(f"🛒 Order from: {supplier}", expanded=True):
-                        display_df = items[['item_name', 'price_per_unit']].copy()
-                        display_df.columns = ['Item Name', 'Rate (₹)']
+                    dist = items.iloc[0]['distance_km']
+                    trip_cost = dist * t_rate
+                    
+                    with st.expander(f"🛒 Order from: {supplier} (Distance: {dist}km, Trip Cost: ₹{trip_cost})", expanded=True):
+                        display_df = items[['item_name', 'price_per_unit', 'landed_cost']].copy()
+                        display_df.columns = ['Item Name', 'Base Rate (₹)', 'True Landed Cost (₹)']
                         st.dataframe(display_df, hide_index=True)
             else:
                 st.info("📭 No rate cards saved yet. Use the form above to add some!")
