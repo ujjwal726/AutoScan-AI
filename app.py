@@ -223,15 +223,14 @@ if api_key:
         if st.button("🔍 Extract & Check Stock"):
             if stock_data_to_process or uploaded_stock_file:
                 with st.spinner('AI is processing inward stock...'):
-                    stock_system_prompt = """You are an Inventory Specialist. Convert input into a Markdown Table.
-                    Columns: [Date, Item Name, Category, Quantity, Unit Price, Total, Type, Payment Mode].
-
+                    stock_system_prompt = """You are an Inventory Specialist. Extract the data and output ONLY a raw JSON array of objects.
+                    Each object MUST have these exact keys: "date", "item_name", "category", "quantity", "unit_price", "total", "payment_mode".
+                    
                     RULES:
-                    1. Output ONLY the markdown table. 
-                    2. DO NOT include any introductory text, explanations, or Python code blocks.
-                    3. Normalization: Standard English names.
-                    4. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
-                    5. Type: Set to 'IN'
+                    1. Output ONLY valid JSON. Do NOT wrap it in ```json or include any conversational text.
+                    2. Normalization: Standard English names.
+                    3. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
+                    4. quantity, unit_price, and total MUST be numbers, not strings.
                     """
                     if stock_option == 'Image/PDF of Purchase Bill' and uploaded_stock_file:
                         img = Image.open(uploaded_stock_file)
@@ -248,11 +247,38 @@ if api_key:
             st.divider()
             st.subheader("📋 Review Extracted Stock")
             st.markdown(st.session_state['temp_stock'])
-            if st.button("💾 Save to Master Inventory"):
-                st.session_state['all_inventory'] += "\n" + st.session_state['temp_stock']
-                st.session_state['temp_stock'] = None 
-                st.success("Stock saved successfully!")
-                st.rerun()
+            if st.button("💾 Save to Database"):
+                try:
+                    import json # We use this to read the AI's JSON output
+                    import sqlite3
+                    
+                    # 1. Read the JSON data from the AI
+                    items = json.loads(st.session_state['temp_stock'])
+                    
+                    # 2. Open the Database we created in Step 1
+                    conn = sqlite3.connect('shop_data.db')
+                    c = conn.cursor()
+                    
+                    # 3. Loop through the AI's data and insert it into the database rows
+                    for item in items:
+                        c.execute('''INSERT INTO inventory (date, item_name, category, quantity, unit_price, total, payment_mode)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?)''', 
+                                  (item.get('date', 'Today'), item.get('item_name', 'Unknown'), 
+                                   item.get('category', 'Other'), item.get('quantity', 0), 
+                                   item.get('unit_price', 0), item.get('total', 0), item.get('payment_mode', 'Cash')))
+                    
+                    # 4. Save and close
+                    conn.commit()
+                    conn.close()
+                    
+                    # 5. Clear temporary memory and refresh the screen
+                    st.session_state['temp_stock'] = None
+                    st.success("✅ Stock permanently saved to the Database!")
+                    st.rerun()
+                    
+                except Exception as e:
+                    # If the AI messes up the format, we catch the error here so the app doesn't crash
+                    st.error(f"❌ Error saving to database. The AI didn't format the JSON correctly. Error: {e}")
 
     # --- MODE: SALES OUT ---
     elif mode == "📈 Daily Sales (Out)":
