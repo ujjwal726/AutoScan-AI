@@ -722,5 +722,50 @@ if api_key:
 
                 except Exception as e:
                     st.error(f"❌ Error saving to database. Ensure AI formatted JSON correctly. Error: {e}")
+            # --- 6. PROCUREMENT DASHBOARD ---
+        st.divider()
+        st.header("🏆 Procurement Dashboard")
+
+        try:
+            import pandas as pd
+            import sqlite3
+
+            # 1. Read the saved data from the database
+            conn = sqlite3.connect('shop_data.db')
+            df_suppliers = pd.read_sql_query("SELECT * FROM suppliers", conn)
+            conn.close()
+
+            # 2. Display the Dashboard if we have data
+            if not df_suppliers.empty:
+                st.subheader("📊 Price Comparison Matrix")
+                st.caption("Green highlights the cheapest rate for each item.")
+                
+                # Create a table comparing all suppliers side-by-side
+                pivot_df = df_suppliers.pivot_table(index='item_name', columns='supplier_name', values='price_per_unit', aggfunc='min')
+                st.dataframe(pivot_df.style.highlight_min(axis=1, color='lightgreen'), use_container_width=True)
+
+                st.divider()
+                st.subheader("📦 Smart Order List (Cheapest Options)")
+                st.info("Here is exactly what you should buy from each supplier to save the most money.")
+                
+                # Find the absolute lowest price for each item using Python math
+                cheapest_items = df_suppliers.loc[df_suppliers.groupby('item_name')['price_per_unit'].idxmin()]
+                
+                # Group those winning items by the supplier
+                grouped_orders = cheapest_items.groupby('supplier_name')
+
+                # Display a clean list for each supplier
+                for supplier, items in grouped_orders:
+                    with st.expander(f"🛒 Order from: {supplier}", expanded=True):
+                        display_df = items[['item_name', 'price_per_unit']].copy()
+                        display_df.columns = ['Item Name', 'Rate (₹)']
+                        st.dataframe(display_df, hide_index=True)
+            else:
+                st.info("📭 No rate cards saved yet. Use the form above to add some!")
+
+        except Exception as e:
+            st.error(f"⚠️ Error loading dashboard: {e}")
+
+            
 else:
     st.warning("Please enter your API Key to begin.")
