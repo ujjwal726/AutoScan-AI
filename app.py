@@ -825,7 +825,7 @@ if api_key:
 
         except Exception as e:
             st.error(f"⚠️ Error loading dashboard: {e}")
-    # --- 7. FINAL ORDER GENERATION (THE BRIDGE) ---
+    #7. FINAL ORDER GENERATION (THE BRIDGE) ---
         st.divider()
         st.header("🚀 Final Step: Smart Purchase Orders")
         st.info("Automatically merging your Weekly Forecast with your Cheapest Suppliers.")
@@ -865,11 +865,18 @@ if api_key:
                 if items_needed.empty:
                     st.success("🟢 Your stock levels are perfectly healthy! No orders needed this week.")
                 else:
-                    # 2. PROCUREMENT MATH (Who is the cheapest?)
-                    cheapest_idx = df_sup.groupby('item_name')['price_per_unit'].idxmin()
+                    # 2. THE MATHEMATICAL FIX: LANDED COST
+                    # Get the transport rate from the UI
+                    t_rate = st.session_state.get('transport_rate', 2.0)
+                    
+                    # Calculate the TRUE cost of the item: Base Price + (Distance * Transport Rate)
+                    df_sup['landed_cost'] = df_sup['price_per_unit'] + (df_sup['distance_km'] * t_rate)
+                    
+                    # NOW we find the cheapest supplier based on the Landed Cost!
+                    cheapest_idx = df_sup.groupby('item_name')['landed_cost'].idxmin()
                     cheapest_sup = df_sup.loc[cheapest_idx]
                     
-                    # 3. THE BRIDGE (Merge needed items with cheapest suppliers)
+                    # 3. THE BRIDGE (Merge needed items with TRUE cheapest suppliers)
                     final_orders = pd.merge(items_needed, cheapest_sup, on='item_name', how='inner')
                     
                     if final_orders.empty:
@@ -877,17 +884,17 @@ if api_key:
                     else:
                         st.subheader("🛒 Your Actionable Orders")
                         
-                        # Group by supplier to avoid multiple delivery fees
+                        # Group by supplier to bundle orders together
                         grouped_final = final_orders.groupby('supplier_name')
                         
                         for supplier, items in grouped_final:
                             dist = items.iloc[0]['distance_km']
-                            trip_cost = dist * st.session_state.get('transport_rate', 2.0)
+                            trip_cost = dist * t_rate
                             
-                            with st.expander(f"📦 Send Order to {supplier} (Trip Cost: ₹{trip_cost})", expanded=True):
-                                # Show the exact quantities
-                                display_df = items[['item_name', 'Qty_to_Order', 'price_per_unit']].copy()
-                                display_df.columns = ['Item Name', 'Qty Needed', 'Cheapest Rate (₹)']
+                            with st.expander(f"📦 Send Order to {supplier} (Distance: {dist}km)", expanded=True):
+                                # Show the exact quantities and the TRUE math
+                                display_df = items[['item_name', 'Qty_to_Order', 'price_per_unit', 'landed_cost']].copy()
+                                display_df.columns = ['Item Name', 'Qty Needed', 'Base Rate (₹)', 'True Landed Cost (₹)']
                                 st.dataframe(display_df, hide_index=True)
                                 
                                 # --- 4. GENERATE DEEP LINKS WITH EXACT QUANTITIES ---
@@ -906,6 +913,5 @@ if api_key:
                                 
         except Exception as e:
             st.error(f"⚠️ Error generating final orders: {e}")
-            
 else:
     st.warning("Please enter your API Key to begin.")
