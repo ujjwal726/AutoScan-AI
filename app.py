@@ -365,56 +365,58 @@ if api_key:
                 except Exception as e:
                     st.error(f"❌ Error saving to database. The AI didn't format the JSON correctly. Error: {e}")
 
-    # --- MODE: DASHBOARD ---
+    # --- MODE: DASHBOARD 
     elif mode == "📊 Inventory Dashboard":
         st.header("📊 Real-Time Inventory & Financial Dashboard")
         
-        if not st.session_state['all_inventory'] and not st.session_state['all_sales']:
-            st.warning("No data found. Please add verified Stock or Sales first.")
-        else:
-            with st.spinner('Calculating totals and auditing records...'):
-                calculation_prompt = f"""
-                You are a Senior Retail Auditor. Use these ledgers:
-                INVENTORY: {st.session_state['all_inventory']}
-                SALES: {st.session_state['all_sales']}
-                
-                OUTPUT RULES:
-                1. All monetary values must be in Rupees (₹).
-                2. You MUST follow this EXACT format:
-
-                ### 📦 Inventory Status
-                | Item Name | Category | Total In | Total Out | Remaining | Current Value (₹) |
-                | :--- | :--- | :--- | :--- | :--- | :--- |
-                | [Item] | [Cat] | [Qty] | [Qty] | [Qty] | [₹ Total] |
-
-                ### 🚩 Financial Audit & Udhari
-                - **Total Investment:** ₹[Amount]
-                - **Total Potential Revenue:** ₹[Amount]
-                - **Actual Cash in Hand:** ₹[Amount]
-                - **Total Udhari (Outstanding Credit):** ₹[Amount]
-                
-                ### 🚀 Business Insights
-                - **Fastest Moving Item:** [Name]
-                - **Top Debtor:** [Name/Details]
-                
-                3. Do not add any conversational text before or after the tables.
-                """
-                
-                calc_response = safe_generate(calculation_prompt)
-                
-                if calc_response:
-                    st.success("Analysis Complete!")
-                    st.markdown(calc_response.text)
+        import sqlite3
+        import pandas as pd
         
-        st.divider()
-        with st.expander("View Raw Saved Ledgers"):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("📦 Master Inventory (IN)")
-                st.markdown(st.session_state['all_inventory'] if st.session_state['all_inventory'] else "Empty")
-            with col2:
-                st.subheader("📉 Master Sales (OUT)")
-                st.markdown(st.session_state['all_sales'] if st.session_state['all_sales'] else "Empty")
+        try:
+            # 1. Connect to database and load data directly into Pandas DataFrames
+            conn = sqlite3.connect('shop_data.db')
+            df_inventory = pd.read_sql_query("SELECT * FROM inventory", conn)
+            df_sales = pd.read_sql_query("SELECT * FROM sales", conn)
+            conn.close()
+            
+            if df_inventory.empty:
+                st.warning("No inventory data found in the database. Please add stock first.")
+            else:
+                # 2. Python does the exact math (No AI Hallucinations!)
+                st.subheader("📦 Accurate Inventory Status")
+                
+                # Group inventory by item_name to get total quantity bought
+                in_summary = df_inventory.groupby('item_name')['quantity'].sum().reset_index()
+                in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
+                
+                # Group sales by item_name to get total quantity sold
+                out_summary = pd.DataFrame(columns=['item_name', 'Total_Out']) # Default empty just in case
+                if not df_sales.empty:
+                    out_summary = df_sales.groupby('item_name')['quantity'].sum().reset_index()
+                    out_summary.rename(columns={'quantity': 'Total_Out'}, inplace=True)
+                
+                # Merge them together to find remaining stock
+                dashboard_df = pd.merge(in_summary, out_summary, on='item_name', how='left').fillna(0)
+                dashboard_df['Remaining_Stock'] = dashboard_df['Total_In'] - dashboard_df['Total_Out']
+                
+                # 3. Display the exact numbers in a clean Streamlit table
+                st.dataframe(dashboard_df, use_container_width=True)
+                
+                # 4. Calculate and show Top-Level Financial Metrics
+                st.divider()
+                st.subheader("💰 Financial Overview")
+                
+                total_investment = df_inventory['total'].sum()
+                total_revenue = df_sales['total'].sum() if not df_sales.empty else 0
+                
+                # Streamlit metrics are great for high-level KPIs
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total Investment", f"₹{total_investment:,.2f}")
+                col2.metric("Total Revenue", f"₹{total_revenue:,.2f}")
+                col3.metric("Current Balance", f"₹{(total_revenue - total_investment):,.2f}")
+
+        except Exception as e:
+            st.error(f"❌ Error loading dashboard: {e}")
 
     # --- MODE: WEEKLY SALES FORECAST ---
     elif mode == "🔮 Weekly Sales Forecast":
