@@ -618,48 +618,7 @@ if api_key:
             st.subheader("📋 Data-Driven Restock Recommendation")
             st.dataframe(display_df, use_container_width=True)
             
-            items_to_order = display_df[display_df['Qty to Order'] > 0]
-            
-            st.divider()
-            st.subheader("🤖 AI Communication Agent")
-            st.caption("Let the AI draft emails to your suppliers based on the table above.")
-            
-            # The API is gated behind this button!
-            if st.button("🚀 Draft Supplier Emails (Uses AI)"):
-                with st.spinner('Agent is drafting emails...'):
-                    try:
-                        exact_data_str = items_to_order.to_string(index=False)
-                        
-                        agent_prompt = f"""
-                        You are an Autonomous Supply Chain Agent. 
-                        Our backend Python engine has calculated exactly what needs to be ordered for the next 7 days.
-                        
-                        CRITICAL REORDER DATA:
-                        {exact_data_str if not items_to_order.empty else "NO ITEMS NEED REORDERING."}
-                        
-                        YOUR MISSION:
-                        1. If the data says "NO ITEMS NEED REORDERING", simply output: "🟢 Stock levels are healthy. No orders needed."
-                        2. If there is data, output ONLY a markdown report with this section:
-                           
-                           ### 📧 Automated Purchase Order Drafts
-                           (Write professional email/WhatsApp templates to the suppliers to place the order for these EXACT quantities. You can group items logically if you want. Leave [Blank] for the supplier names).
-                        
-                        RULES:
-                        - NEVER change the 'Qty to Order' numbers.
-                        - Do not explain the math, just write the emails.
-                        """
-                        
-                        agent_response = safe_generate(agent_prompt)
-                        
-                        if agent_response:
-                            st.session_state['latest_email'] = agent_response.text
-                            st.success("✅ Emails Drafted!")
-                            
-                    except Exception as e:
-                        st.error(f"❌ Agent encountered an error: {e}")
-
-            if st.session_state['latest_email']:
-                st.markdown(st.session_state['latest_email'])
+           
     # --- MODE: SMART PROCUREMENT (RATE CARDS) ---
     elif mode == "📑 Smart Procurement (Rate Cards)":
         st.header("📑 Upload Supplier Rate Cards")
