@@ -845,18 +845,29 @@ if api_key:
             if df_inv.empty or df_sal.empty or df_sup.empty:
                 st.warning("⚠️ Need Inventory, Sales, AND Supplier data to generate final orders.")
             else:
-                # 1. FORECAST MATH (What do we need to buy?)
-                in_sum = df_inv.groupby('item_name')['quantity'].sum().reset_index().rename(columns={'quantity': 'Total_In'})
-                out_sum = df_sal.groupby('item_name')['quantity'].sum().reset_index().rename(columns={'quantity': 'Total_Out'})
+                #  FORECAST MATH (Syncing the exact "Kirana Intuition" logic from the Forecast tab)
+                in_summary = df_inv.groupby('item_name')['quantity'].sum().reset_index()
+                in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
                 
-                df_forecast = pd.merge(in_sum, out_sum, on='item_name', how='left').fillna(0)
-                df_forecast['Remaining'] = df_forecast['Total_In'] - df_forecast['Total_Out']
+                # Calculate Recency Bias
+                df_sal['date'] = pd.to_datetime(df_sal['date'])
+                latest_date = df_sal['date'].max()
+                cutoff_date = latest_date - pd.Timedelta(days=7)
                 
-                days_active = df_sal['date'].nunique() if df_sal['date'].nunique() > 0 else 1
-                df_forecast['Daily_Velocity'] = df_forecast['Total_Out'] / days_active
+                out_total = df_sal.groupby('item_name')['quantity'].sum().reset_index()
+                out_recent = df_sal[df_sal['date'] >= cutoff_date].groupby('item_name')['quantity'].sum().reset_index()
                 
-                # Next 7 Days Demand + 15% Safety Stock
-                df_forecast['Demand_7D'] = (df_forecast['Daily_Velocity'] * 7 * 1.15).round(0)
+                sales_stats = pd.merge(out_total, out_recent, on='item_name', how='left', suffixes=('_total', '_7d')).fillna(0)
+                
+                # The "Kirana Intuition" Formula
+                sales_stats['hist_vel'] = (sales_stats['quantity_total'] - sales_stats['quantity_7d']) / 23
+                sales_stats['recent_vel'] = sales_stats['quantity_7d'] / 7
+                sales_stats['Blended_Daily_Velocity'] = (sales_stats['recent_vel'] * 0.70) + (sales_stats['hist_vel'] * 0.30)
+                sales_stats['Demand_7D'] = (sales_stats['Blended_Daily_Velocity'] * 7 * 1.15).round(0)
+                
+                # Merge and find final Qty_to_Order
+                df_forecast = pd.merge(in_summary, sales_stats, on='item_name', how='left').fillna(0)
+                df_forecast['Remaining'] = df_forecast['Total_In'] - df_forecast['quantity_total']
                 df_forecast['Qty_to_Order'] = (df_forecast['Demand_7D'] - df_forecast['Remaining']).clip(lower=0)
                 
                 # Filter out items we don't need to buy
