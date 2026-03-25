@@ -710,6 +710,33 @@ if api_key:
                     
                 except Exception as e:
                     st.error(f"❌ Error saving to database. The AI didn't format the JSON correctly. Error: {e}")
+    # --- MODE: SMART PROCUREMENT (RATE CARDS) ---
+    elif mode == "📑 Smart Procurement (Rate Cards)":
+        st.header("📑 Master Supplier Catalog")
+        st.info("This is a simple preview of the rate cards saved in our database.")
+        
+        import sqlite3
+        import pandas as pd
+        
+        try:
+            # 1. Connect to the database
+            conn = sqlite3.connect('shop_data.db')
+            
+            # 2. Read the suppliers table using Pandas
+            df_suppliers = pd.read_sql_query("SELECT * FROM suppliers", conn)
+            conn.close()
+            
+            # 3. Display the data
+            if df_suppliers.empty:
+                st.warning("📭 No supplier data found yet. We will build the upload feature next!")
+            else:
+                st.subheader("📋 Current Rate Cards")
+                # Show a clean, interactive table
+                st.dataframe(df_suppliers, use_container_width=True, hide_index=True)
+                
+        except Exception as e:
+            # If the table doesn't exist yet, we catch the error gracefully
+            st.error(f"⚠️ Could not load database: {e}")
 
 else:
     st.warning("Please enter your API Key to begin.")
