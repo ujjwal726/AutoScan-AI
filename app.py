@@ -418,57 +418,70 @@ if api_key:
         except Exception as e:
             st.error(f"❌ Error loading dashboard: {e}")
 
-    # --- MODE: WEEKLY SALES FORECAST ---
+    # --- MODE: WEEKLY SALES FORECAST (THE AGENT) ---
     elif mode == "🔮 Weekly Sales Forecast":
-        st.header("🔮 AI Sales & Inventory Forecast (Next 7 Days)")
+        st.header("🤖 AI Supply Chain Agent")
+        st.info("The Agent uses exact database numbers to determine what to reorder.")
         
-        if not st.session_state['all_sales']:
-            st.warning("Please upload sales data first to predict the future.")
+        import sqlite3
+        import pandas as pd
+        
+        # 1. Connect to DB and get data
+        conn = sqlite3.connect('shop_data.db')
+        df_inventory = pd.read_sql_query("SELECT * FROM inventory", conn)
+        df_sales = pd.read_sql_query("SELECT * FROM sales", conn)
+        conn.close()
+        
+        if df_inventory.empty or df_sales.empty:
+            st.warning("Please add both stock and sales data to run the AI Agent.")
         else:
-            with st.spinner('AI is simulating market demand for next week...'):
-                prediction_prompt = f"""
-                You are a Senior Supply Chain Data Scientist and Retail Coach. 
-                TODAY'S DATE: March 24, 2026.
+            with st.spinner('Agent is analyzing accurate database metrics...'):
+                try:
+                    # 2. Python does the exact math to figure out what is left
+                    in_summary = df_inventory.groupby('item_name')['quantity'].sum().reset_index()
+                    in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
+                    
+                    out_summary = df_sales.groupby('item_name')['quantity'].sum().reset_index()
+                    out_summary.rename(columns={'quantity': 'Total_Out'}, inplace=True)
+                    
+                    df_agent = pd.merge(in_summary, out_summary, on='item_name', how='left').fillna(0)
+                    df_agent['Remaining_Stock'] = df_agent['Total_In'] - df_agent['Total_Out']
+                    
+                    # 3. Convert the exact math into a string the AI can read
+                    exact_data_str = df_agent.to_string(index=False)
+                    
+                    # 4. The Agentic Prompt: We give it facts, it gives us actions
+                    agent_prompt = f"""
+                    You are an Autonomous Supply Chain Agent for a retail shop. 
+                    Here is the 100% accurate current inventory data calculated by our backend system:
+                    
+                    {exact_data_str}
+                    
+                    YOUR MISSION:
+                    1. Analyze the 'Remaining_Stock' vs 'Total_Out'.
+                    2. Identify which items are critically low or out of stock.
+                    3. Output a markdown report with exactly two sections:
+                       
+                       ### 🚨 Restock Intelligence
+                       (Briefly explain what items need to be ordered and why, based ONLY on the data provided).
+                       
+                       ### 📧 Automated Supplier Email Draft
+                       (Write a professional email template to the supplier requesting new stock for ONLY the critical items. Leave [Blank] for the supplier's name).
+                    
+                    RULES:
+                    - Do NOT hallucinate numbers. Use only the exact numbers provided in the data.
+                    - Do NOT output any conversational text outside of the two markdown sections.
+                    """
+                    
+                    # 5. Execute the AI call
+                    agent_response = safe_generate(agent_prompt)
+                    
+                    if agent_response:
+                        st.success("✅ Agent Analysis Complete!")
+                        st.markdown(agent_response.text)
                 
-                DATA:
-                SALES: {st.session_state['all_sales']}
-                STOCK: {st.session_state['all_inventory']}
-                
-                STRICT MATHEMATICAL INSTRUCTIONS:
-                1. Calculate Weighted Velocity (Vw): (Avg sales of last 3 days * 0.7) + (Avg sales of previous 4 days * 0.3).
-                2. Calculate Momentum Factor (M): (Avg sales of last 2 days / Avg sales of first 5 days).
-                3. Calculate Volatility Buffer (SS): If daily sales variance is > 30%, add a 40% safety stock. Otherwise, add 15%.
-                4. Projected 7-Day Demand (D7): (Vw * 7 * M) + SS.
-                5. Net Purchase Requirement: D7 - Current On-Hand Stock.
-                
-                OUTPUT RULES FOR LAYMAN:
-                - Convert these complex results into a 'Simple Shopkeeper View'.
-                - Use 'Traffic Light' Status (🔴 Critical/Out soon, 🟡 Order soon, 🟢 Healthy).
-                - Use plain English for 'Why' (e.g., 'Demand is spiking fast' or 'Stock is clearing slow').
-                
-                OUTPUT FORMAT:
-                ### 🔮 Professional 7-Day Forecast & Order Guide
-                | Item Name | Status | Recommendation(Buy Quantity) | Why this? |
-                | :--- | :--- | :--- | :--- |
-                | [Item] | [🔴/🟡/🟢] | **[Buy Qty]** | [Reasoning in plain English] |
-
-                ### 🚦 Inventory Runway
-                - **Critical Stock-Out Alert:** [List items running out in < 48 hours]
-                - **The 'Cash-Cow' (Most Profitable Item):** [Identify highest margin/velocity item]
-                
-                ### 💡 AI Shop Strategy
-                Provide one 'High-Impact' retail tip (e.g., 'Bundle Sugar with Tea this week as both are trending up together').
-                
-                RULES:
-                - DO NOT show the math formulas in the output.
-                - Output ONLY the markdown sections.
-                - If Net Purchase is < 0, recommend 0.
-                """
-                forecast_res = safe_generate(prediction_prompt)
-                
-                if forecast_res:
-                    st.success("7-Day Forecast Ready!")
-                    st.markdown(forecast_res.text)
+                except Exception as e:
+                    st.error(f"❌ Agent encountered an error: {e}")
 
 else:
     st.warning("Please enter your API Key to begin.")
