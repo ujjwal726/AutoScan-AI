@@ -309,15 +309,14 @@ if api_key:
         if st.button("🔍 Extract & Check Sales"):
             if sales_data_to_process or uploaded_sales_file:
                 with st.spinner('AI is extracting transaction data...'):
-                    sales_system_prompt = """You are a Sales Specialist. Convert input into a Markdown Table.
-                    Columns: [Date, Item Name, Category, Quantity, Unit Price, Total, Type, Payment Mode].
-
+                    sales_system_prompt = """You are a Sales Specialist. Extract the transaction data and output ONLY a raw JSON array of objects.
+                    Each object MUST have these exact keys: "date", "item_name", "category", "quantity", "unit_price", "total", "payment_mode".
+                    
                     RULES:
-                    1. Output ONLY the markdown table. 
-                    2. DO NOT include any introductory text, explanations, or Python code blocks.
-                    3. Normalization: Standard English names.
-                    4. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
-                    5. Type: Set to 'OUT'
+                    1. Output ONLY valid JSON. Do NOT wrap it in ```json or include any conversational text.
+                    2. Normalization: Standard English names.
+                    3. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
+                    4. quantity, unit_price, and total MUST be numbers, not strings.
                     """
                     if sales_option == 'Image/PDF of Paper Records' and uploaded_sales_file:
                         img = Image.open(uploaded_sales_file)
@@ -334,11 +333,37 @@ if api_key:
             st.divider()
             st.subheader("✅ Extracted Sales Data (Preview)")
             st.markdown(st.session_state['temp_sales'])
-            if st.button("💾 Save to Sales Ledger"):
-                st.session_state['all_sales'] += "\n" + st.session_state['temp_sales']
-                st.session_state['temp_sales'] = None
-                st.success("Sales record saved successfully!")
-                st.rerun()
+            if st.button("💾 Save to Database"):
+                try:
+                    import json 
+                    import sqlite3
+                    
+                    # 1. Read the JSON data from the AI
+                    items = json.loads(st.session_state['temp_sales'])
+                    
+                    # 2. Open the Database
+                    conn = sqlite3.connect('shop_data.db')
+                    c = conn.cursor()
+                    
+                    # 3. Insert into the SALES table (Notice it says 'sales' here, not 'inventory')
+                    for item in items:
+                        c.execute('''INSERT INTO sales (date, item_name, category, quantity, unit_price, total, payment_mode)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?)''', 
+                                  (item.get('date', 'Today'), item.get('item_name', 'Unknown'), 
+                                   item.get('category', 'Other'), item.get('quantity', 0), 
+                                   item.get('unit_price', 0), item.get('total', 0), item.get('payment_mode', 'Cash')))
+                    
+                    # 4. Save and close
+                    conn.commit()
+                    conn.close()
+                    
+                    # 5. Clear temporary memory
+                    st.session_state['temp_sales'] = None
+                    st.success("✅ Sales permanently saved to the Database!")
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Error saving to database. The AI didn't format the JSON correctly. Error: {e}")
 
     # --- MODE: DASHBOARD ---
     elif mode == "📊 Inventory Dashboard":
