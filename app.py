@@ -617,6 +617,19 @@ if api_key:
     elif mode == "📑 Smart Procurement (Rate Cards)":
         st.header("📑 Upload Supplier Rate Cards")
         st.info("Upload your supplier rate cards one by one. You can add up to 5 suppliers.")
+        # --- NEW: CLEAR DATA BUTTON ---
+        if st.button("🗑️ Clear All Saved Rate Cards"):
+            try:
+                import sqlite3
+                conn = sqlite3.connect('shop_data.db')
+                c = conn.cursor()
+                c.execute("DELETE FROM suppliers")
+                conn.commit()
+                conn.close()
+                st.success("✅ All supplier rate cards have been permanently deleted!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error clearing data: {e}")
 
         # 1. Global Transport Cost Setting
         st.subheader("🚚 Transport Setting")
