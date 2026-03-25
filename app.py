@@ -756,7 +756,7 @@ if api_key:
 
                 except Exception as e:
                     st.error(f"❌ Error saving to database. Ensure AI formatted JSON correctly. Error: {e}")
-        # --- 6. PROCUREMENT DASHBOARD ---
+        # 6. PROCUREMENT DASHBOARD ---
         st.divider()
         st.header("🏆 Procurement Dashboard")
 
@@ -764,49 +764,69 @@ if api_key:
             import pandas as pd
             import sqlite3
 
-            # 1. Read the saved data from the database
             conn = sqlite3.connect('shop_data.db')
             df_suppliers = pd.read_sql_query("SELECT * FROM suppliers", conn)
             conn.close()
 
-            # 2. Display the Dashboard if we have data
             if not df_suppliers.empty:
                 st.subheader("📊 Price Comparison Matrix (Base Price)")
                 st.caption("Green highlights the cheapest RAW rate for each item (ignoring transport).")
                 
-                # Create a table comparing all base prices
                 pivot_df = df_suppliers.pivot_table(index='item_name', columns='supplier_name', values='price_per_unit', aggfunc='min')
                 st.dataframe(pivot_df.style.highlight_min(axis=1, color='lightgreen'), use_container_width=True)
 
+                # --- NEW: TRUE VOLUMETRIC MATH ---
+                # We map the real-world weight to each item so transport math is 100% accurate.
+                weight_map = {
+                    "Aashirvaad Atta 5kg": 5.0,
+                    "Fortune Sunflower Oil 1L": 1.0,
+                    "Tata Salt 1kg": 1.0,
+                    "Maggi 140g": 0.14,
+                    "Surf Excel Matic 1kg": 1.0,
+                    "Amul Butter 100g": 0.10,
+                    "Parle-G 250g": 0.25,
+                    "Red Label Tea 250g": 0.25,
+                    "Sugar 1kg": 1.0,
+                    "Lifebuoy Soap": 0.10
+                }
+                
+                # Apply weights to the dataframe (default to 1kg if an item isn't in our dictionary)
+                df_suppliers['weight_kg'] = df_suppliers['item_name'].map(weight_map).fillna(1.0)
+                
+                t_rate = st.session_state.get('transport_rate', 2.0)
+                
+                # True Landed Cost = Base Price + (Distance * Rate * Weight)
+                df_suppliers['landed_cost'] = df_suppliers['price_per_unit'] + (df_suppliers['distance_km'] * t_rate * df_suppliers['weight_kg'])
+                
+                st.divider()
+                st.subheader("🟢 True Landed Cost Matrix")
+                st.caption(f"Green highlights the actual cheapest option including ₹{t_rate}/km transport adjusted for item weight!")
+                
+                pivot_landed = df_suppliers.pivot_table(index='item_name', columns='supplier_name', values='landed_cost', aggfunc='min')
+                st.dataframe(pivot_landed.style.highlight_min(axis=1, color='lightgreen'), use_container_width=True)
+
                 st.divider()
                 st.subheader("📦 Smart Order List (Optimized by Landed Cost)")
-                st.info("Here is the TRUE cheapest supplier for each item when transport costs are included.")
+                st.info("Here is exactly what you should buy from each supplier to save the absolute most money.")
                 
-                # --- THE MATHEMATICAL UPGRADE: LANDED COST ---
-                t_rate = st.session_state.get('transport_rate', 2.0)
-                df_suppliers['landed_cost'] = df_suppliers['price_per_unit'] + (df_suppliers['distance_km'] * t_rate)
-                
-                # Find the absolute lowest TRUE price for each item using the new math
                 cheapest_items = df_suppliers.loc[df_suppliers.groupby('item_name')['landed_cost'].idxmin()]
-                
-                # Group those winning items by the supplier
                 grouped_orders = cheapest_items.groupby('supplier_name')
 
-                # Display a clean list for each supplier
                 for supplier, items in grouped_orders:
                     dist = items.iloc[0]['distance_km']
                     trip_cost = dist * t_rate
                     
-                    with st.expander(f"🛒 Order from: {supplier} (Distance: {dist}km, Trip Cost: ₹{trip_cost})", expanded=True):
-                        display_df = items[['item_name', 'price_per_unit', 'landed_cost']].copy()
-                        display_df.columns = ['Item Name', 'Base Rate (₹)', 'True Landed Cost (₹)']
+                    with st.expander(f"🛒 Order from: {supplier} (Distance: {dist}km)", expanded=True):
+                        display_df = items[['item_name', 'weight_kg', 'price_per_unit', 'landed_cost']].copy()
+                        display_df.columns = ['Item Name', 'Weight (kg)', 'Base Rate (₹)', 'True Landed Cost (₹)']
                         st.dataframe(display_df, hide_index=True)
             else:
                 st.info("📭 No rate cards saved yet. Use the form above to add some!")
 
         except Exception as e:
             st.error(f"⚠️ Error loading dashboard: {e}")
-    #7. FINAL ORDER GENERATION (THE BRIDGE) ---
+
+        # --- 7. FINAL ORDER GENERATION (THE BRIDGE) ---
         st.divider()
         st.header("🚀 Final Step: Smart Purchase Orders")
         st.info("Automatically merging your Weekly Forecast with your Cheapest Suppliers.")
@@ -822,15 +842,13 @@ if api_key:
             df_sup = pd.read_sql_query("SELECT * FROM suppliers", conn)
             conn.close()
             
-            # We need all three pieces of data to do this math
             if df_inv.empty or df_sal.empty or df_sup.empty:
                 st.warning("⚠️ Need Inventory, Sales, AND Supplier data to generate final orders.")
             else:
-                #  FORECAST MATH (Syncing the exact "Kirana Intuition" logic from the Forecast tab)
+                # 1. FORECAST MATH 
                 in_summary = df_inv.groupby('item_name')['quantity'].sum().reset_index()
                 in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
                 
-                # Calculate Recency Bias
                 df_sal['date'] = pd.to_datetime(df_sal['date'])
                 latest_date = df_sal['date'].max()
                 cutoff_date = latest_date - pd.Timedelta(days=7)
@@ -840,56 +858,53 @@ if api_key:
                 
                 sales_stats = pd.merge(out_total, out_recent, on='item_name', how='left', suffixes=('_total', '_7d')).fillna(0)
                 
-                # The "Kirana Intuition" Formula
                 sales_stats['hist_vel'] = (sales_stats['quantity_total'] - sales_stats['quantity_7d']) / 23
                 sales_stats['recent_vel'] = sales_stats['quantity_7d'] / 7
                 sales_stats['Blended_Daily_Velocity'] = (sales_stats['recent_vel'] * 0.70) + (sales_stats['hist_vel'] * 0.30)
                 sales_stats['Demand_7D'] = (sales_stats['Blended_Daily_Velocity'] * 7 * 1.15).round(0)
                 
-                # Merge and find final Qty_to_Order
                 df_forecast = pd.merge(in_summary, sales_stats, on='item_name', how='left').fillna(0)
                 df_forecast['Remaining'] = df_forecast['Total_In'] - df_forecast['quantity_total']
                 df_forecast['Qty_to_Order'] = (df_forecast['Demand_7D'] - df_forecast['Remaining']).clip(lower=0)
                 
-                # Filter out items we don't need to buy
                 items_needed = df_forecast[df_forecast['Qty_to_Order'] > 0]
                 
                 if items_needed.empty:
                     st.success("🟢 Your stock levels are perfectly healthy! No orders needed this week.")
                 else:
-                    # 2. THE MATHEMATICAL FIX: LANDED COST
-                    # Get the transport rate from the UI
+                    # 2. APPLY THE SAME WEIGHT MATH HERE
+                    weight_map = {
+                        "Aashirvaad Atta 5kg": 5.0, "Fortune Sunflower Oil 1L": 1.0,
+                        "Tata Salt 1kg": 1.0, "Maggi 140g": 0.14,
+                        "Surf Excel Matic 1kg": 1.0, "Amul Butter 100g": 0.10,
+                        "Parle-G 250g": 0.25, "Red Label Tea 250g": 0.25,
+                        "Sugar 1kg": 1.0, "Lifebuoy Soap": 0.10
+                    }
+                    df_sup['weight_kg'] = df_sup['item_name'].map(weight_map).fillna(1.0)
                     t_rate = st.session_state.get('transport_rate', 2.0)
+                    df_sup['landed_cost'] = df_sup['price_per_unit'] + (df_sup['distance_km'] * t_rate * df_sup['weight_kg'])
                     
-                    # Calculate the TRUE cost of the item: Base Price + (Distance * Transport Rate)
-                    df_sup['landed_cost'] = df_sup['price_per_unit'] + (df_sup['distance_km'] * t_rate)
-                    
-                    # NOW we find the cheapest supplier based on the Landed Cost!
                     cheapest_idx = df_sup.groupby('item_name')['landed_cost'].idxmin()
                     cheapest_sup = df_sup.loc[cheapest_idx]
                     
-                    # 3. THE BRIDGE (Merge needed items with TRUE cheapest suppliers)
+                    # 3. THE BRIDGE
                     final_orders = pd.merge(items_needed, cheapest_sup, on='item_name', how='inner')
                     
                     if final_orders.empty:
                         st.warning("You need to restock items, but your uploaded suppliers don't sell them!")
                     else:
                         st.subheader("🛒 Your Actionable Orders")
-                        
-                        # Group by supplier to bundle orders together
                         grouped_final = final_orders.groupby('supplier_name')
                         
                         for supplier, items in grouped_final:
                             dist = items.iloc[0]['distance_km']
-                            trip_cost = dist * t_rate
                             
                             with st.expander(f"📦 Send Order to {supplier} (Distance: {dist}km)", expanded=True):
-                                # Show the exact quantities and the TRUE math
                                 display_df = items[['item_name', 'Qty_to_Order', 'price_per_unit', 'landed_cost']].copy()
                                 display_df.columns = ['Item Name', 'Qty Needed', 'Base Rate (₹)', 'True Landed Cost (₹)']
                                 st.dataframe(display_df, hide_index=True)
                                 
-                                # --- 4. GENERATE DEEP LINKS WITH EXACT QUANTITIES ---
+                                # --- 4. DEEP LINKS ---
                                 order_text = f"Hello {supplier},\n\nPlease prepare the following order for pickup:\n\n"
                                 for _, row in items.iterrows():
                                     order_text += f"- {int(row['Qty_to_Order'])} units of {row['item_name']}\n"
