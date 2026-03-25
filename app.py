@@ -276,53 +276,6 @@ if api_key:
                 st.rerun() # Refresh the screen to show the new data
             except Exception as e:
                 st.sidebar.error(f"Error running simulation: {e}")
-    # --- NEW: SUPPLIER SIMULATION BUTTON ---
-    if st.sidebar.button("🏭 Generate Fake Rate Cards", help="Injects 5 rival suppliers for testing."):
-        import random
-        import sqlite3
-
-        with st.spinner("Generating rival supplier data..."):
-            try:
-                conn = sqlite3.connect('shop_data.db')
-                c = conn.cursor()
-                
-                # Wipe old supplier data so we start fresh
-                c.execute("DELETE FROM suppliers")
-                
-                # Our standard Kirana catalog (Base Prices)
-                catalog = [
-                    ("Aashirvaad Atta 5kg", 180), ("Fortune Sunflower Oil 1L", 110),
-                    ("Tata Salt 1kg", 18), ("Maggi 140g", 22),
-                    ("Surf Excel Matic 1kg", 170), ("Amul Butter 100g", 45),
-                    ("Parle-G 250g", 20), ("Red Label Tea 250g", 120),
-                    ("Sugar 1kg", 38), ("Lifebuoy Soap", 25)
-                ]
-                
-                # 5 Rival Suppliers (Name, Distance, Min Multiplier, Max Multiplier)
-                suppliers_list = [
-                    ("Raju Traders", 3.0, 0.98, 1.05),
-                    ("Metro Cash & Carry", 12.0, 0.92, 0.99), # Generally cheaper, but far
-                    ("Gupta Wholesale", 1.5, 0.99, 1.08),     # Close, but expensive
-                    ("Udaan B2B", 8.0, 0.95, 1.02),
-                    ("Local Mandi", 5.0, 0.90, 1.00)          # Wildcard pricing
-                ]
-                
-                # Generate the prices!
-                for item_name, base_price in catalog:
-                    for sup_name, dist, min_var, max_var in suppliers_list:
-                        # Calculate a realistic, slightly randomized price
-                        sup_price = round(base_price * random.uniform(min_var, max_var), 2)
-                        
-                        c.execute('''INSERT INTO suppliers (supplier_name, item_name, price_per_unit, distance_km, contact_info) 
-                                     VALUES (?, ?, ?, ?, ?)''', 
-                                  (sup_name, item_name, sup_price, dist, f"orders@{sup_name.replace(' ', '').lower()}.in"))
-                                  
-                conn.commit()
-                conn.close()
-                st.sidebar.success("✅ 5 Fake Rate Cards Injected!")
-                st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"Error generating suppliers: {e}")        
 
     # --- MODE: STOCK IN ---
     if mode == "📦 Add New Stock (In)":
@@ -660,38 +613,52 @@ if api_key:
 
             if st.session_state['latest_email']:
                 st.markdown(st.session_state['latest_email'])
-            # --- MODE: SMART PROCUREMENT (RATE CARDS) ---
+    # --- MODE: SMART PROCUREMENT (RATE CARDS) ---
     elif mode == "📑 Smart Procurement (Rate Cards)":
         st.header("📑 Upload Supplier Rate Cards")
-        st.info("Upload your rate cards exactly like you upload daily sales.")
-        
-        # 1. Capture the Supplier Details & Transport
+        st.info("Upload your supplier rate cards one by one. You can add up to 5 suppliers.")
+
+        # 1. Global Transport Cost Setting
+        st.subheader("🚚 Transport Setting")
+        if 'transport_rate' not in st.session_state:
+            st.session_state['transport_rate'] = 2.0
+        st.session_state['transport_rate'] = st.number_input("Transport Cost (₹ per km per kg/unit)", value=st.session_state['transport_rate'], step=0.5)
+
+        # 2. Supplier Details
+        st.divider()
         st.subheader("1. Supplier Details")
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         supplier_name = col1.text_input("Supplier Name", placeholder="e.g., Raju Traders")
-        distance_km = col2.number_input("Distance (km)", value=5.0)
-        transport_rate = col3.number_input("Transport Cost (₹ per km)", value=15.0)
-        
+        distance_km = col2.number_input("Distance from Shop (km)", value=5.0, step=0.5)
+
         st.divider()
         st.subheader("2. Upload Rate Data")
-        
-        # 2. The exact same UI pattern as Inventory/Sales
+
+        # 3. The exact same UI pattern as Inventory/Sales
         rc_option = st.selectbox(
             'How are you uploading this rate card?',
-            ('Manual Text Entry', 'Image/PDF of Rate Card')
+            ('Manual Text Entry', 'Image/PDF of Rate Card', 'Excel/CSV Spreadsheet')
         )
-        
+
         rc_data_to_process = None
         uploaded_rc_file = None
-        
+
         if rc_option == 'Manual Text Entry':
             rc_data_to_process = st.text_area("Paste Rate Card Items:", height=150, placeholder="Example: Sugar 40, Maggi 22...")
         elif rc_option == 'Image/PDF of Rate Card':
-            uploaded_rc_file = st.file_uploader("Upload Rate Card Photo", type=['png', 'jpg', 'jpeg'])
+            uploaded_rc_file = st.file_uploader("Upload Rate Card Photo/PDF", type=['png', 'jpg', 'jpeg', 'pdf'])
             if uploaded_rc_file:
                 st.image(uploaded_rc_file, caption="Rate Card Preview", width=300)
-                
-        # 3. Extract Button
+        elif rc_option == 'Excel/CSV Spreadsheet':
+            digital_rc_file = st.file_uploader("Upload Digital Rate Card", type=['csv', 'xlsx'])
+            if digital_rc_file:
+                import pandas as pd
+                df_rc = pd.read_csv(digital_rc_file) if digital_rc_file.name.endswith('csv') else pd.read_excel(digital_rc_file)
+                st.write("Preview of Digital Rate Card:")
+                st.dataframe(df_rc.head())
+                rc_data_to_process = df_rc.to_string()
+
+        # 4. Extract Button
         if st.button("🔍 Extract Rate Card"):
             if not supplier_name:
                 st.warning("⚠️ Please enter a Supplier Name at the top first!")
@@ -703,7 +670,7 @@ if api_key:
                     RULES:
                     1. Output ONLY valid JSON. Do not wrap in markdown.
                     2. Normalization: Standard English names (e.g. "Sugar", "Atta").
-                    3. Make sure prices are raw numbers, not strings with currency symbols.
+                    3. Make sure prices are raw numbers, not strings.
                     """
                     try:
                         if rc_option == 'Image/PDF of Rate Card' and uploaded_rc_file:
@@ -712,9 +679,8 @@ if api_key:
                             response = safe_generate([rc_prompt, img])
                         else:
                             response = safe_generate([rc_prompt, rc_data_to_process])
-                            
+
                         if response:
-                            # Save the AI response and the supplier info to temporary memory
                             st.session_state['temp_rc'] = response.text
                             st.session_state['temp_sup_name'] = supplier_name
                             st.session_state['temp_dist'] = distance_km
@@ -723,61 +689,38 @@ if api_key:
             else:
                 st.warning("Please provide rate card data first.")
 
-        # 4. Preview and Save to Database
+        # 5. Preview and Save
         if st.session_state.get('temp_rc'):
             st.divider()
             st.subheader("✅ Extracted Prices (Preview)")
             st.markdown(st.session_state['temp_rc'])
-            
+
             if st.button("💾 Save to Supplier Database"):
                 try:
-                    import json 
+                    import json
                     import sqlite3
-                    
+
                     items = json.loads(st.session_state['temp_rc'])
-                    
                     conn = sqlite3.connect('shop_data.db')
                     c = conn.cursor()
-                    
-                    # Delete old prices from this specific supplier so we don't get duplicates if you re-upload
+
+                    # Delete old prices from this specific supplier to prevent duplicates
                     c.execute("DELETE FROM suppliers WHERE supplier_name = ?", (st.session_state['temp_sup_name'],))
-                    
+
                     for item in items:
                         c.execute('''INSERT INTO suppliers (supplier_name, item_name, price_per_unit, distance_km, contact_info)
-                                     VALUES (?, ?, ?, ?, ?)''', 
-                                  (st.session_state['temp_sup_name'], item.get('item_name', 'Unknown'), 
+                                     VALUES (?, ?, ?, ?, ?)''',
+                                  (st.session_state['temp_sup_name'], item.get('item_name', 'Unknown'),
                                    float(item.get('price_per_unit', 0)), st.session_state['temp_dist'], "WhatsApp"))
-                    
+
                     conn.commit()
                     conn.close()
-                    
+
                     st.session_state['temp_rc'] = None
                     st.success(f"✅ {st.session_state['temp_sup_name']} saved successfully!")
                     st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"❌ Error saving to database. The AI didn't format the JSON correctly. Error: {e}")
-    # 5. SIMPLE SUPPLIER DASHBOARD (PREVIEW) ---
-        st.divider()
-        st.subheader("📋 Saved Supplier Rate Cards")
-        
-        try:
-            import pandas as pd
-            import sqlite3
-            
-            # Connect to the database and read the suppliers table
-            conn = sqlite3.connect('shop_data.db')
-            df_suppliers = pd.read_sql_query("SELECT * FROM suppliers", conn)
-            conn.close()
-            
-            # Display the data if it exists
-            if df_suppliers.empty:
-                st.info("📭 No rate cards saved yet. Use the form above to extract and save some data!")
-            else:
-                st.dataframe(df_suppliers, use_container_width=True, hide_index=True)
-                
-        except Exception as e:
-            st.error(f"⚠️ Could not load database table. Make sure you updated the init_db() function! Error: {e}")
 
+                except Exception as e:
+                    st.error(f"❌ Error saving to database. Ensure AI formatted JSON correctly. Error: {e}")
 else:
     st.warning("Please enter your API Key to begin.")
