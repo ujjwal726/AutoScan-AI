@@ -203,14 +203,29 @@ if api_key:
     # --- ADMINISTRATIVE RESET SWITCH ---
     st.sidebar.divider()
     st.sidebar.subheader("⚠️ Administrative Actions")
-    if st.sidebar.button("🗑️ Reset All Data", help="Permanently delete all saved Stock and Sales records."):
-        st.session_state['all_sales'] = ""
-        st.session_state['all_inventory'] = ""
-        st.session_state['temp_stock'] = None
-        st.session_state['temp_sales'] = None
-        st.sidebar.success("System Reset Successful!")
-        st.rerun()
-
+    if st.sidebar.button("🗑️ Reset All Data", help="Permanently delete ALL saved data (Stock, Sales, and Suppliers)."):
+        try:
+            import sqlite3
+            conn = sqlite3.connect('shop_data.db')
+            c = conn.cursor()
+            
+            # 1. Wipe all permanent database tables!
+            c.execute("DELETE FROM inventory")
+            c.execute("DELETE FROM sales")
+            c.execute("DELETE FROM suppliers")
+            
+            conn.commit()
+            conn.close()
+            
+            # 2. Wipe the temporary AI extraction memory
+            st.session_state['temp_stock'] = None
+            st.session_state['temp_sales'] = None
+            st.session_state['temp_rc'] = None
+            
+            st.sidebar.success("✅ System Reset Successful! All databases wiped clean.")
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"❌ Error resetting data: {e}")
     if 'inventory' not in st.session_state:
         st.session_state['inventory'] = {} 
 
