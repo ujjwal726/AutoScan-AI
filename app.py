@@ -756,20 +756,7 @@ if api_key:
 
                 except Exception as e:
                     st.error(f"❌ Error saving to database. Ensure AI formatted JSON correctly. Error: {e}")
-            # --- 6. PROCUREMENT DASHBOARD ---
-        st.divider()
-        st.header("🏆 Procurement Dashboard")
-
-        try:
-            import pandas as pd
-            import sqlite3
-
-            # 1. Read the saved data from the database
-            conn = sqlite3.connect('shop_data.db')
-            df_suppliers = pd.read_sql_query("SELECT * FROM suppliers", conn)
-            conn.close()
-
-            # --- 6. PROCUREMENT DASHBOARD ---
+        # --- 6. PROCUREMENT DASHBOARD ---
         st.divider()
         st.header("🏆 Procurement Dashboard")
 
