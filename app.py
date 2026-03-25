@@ -174,10 +174,18 @@ if api_key:
         st.session_state['temp_stock'] = None
     if 'temp_sales' not in st.session_state:
         st.session_state['temp_sales'] = None
+    if 'temp_rc' not in st.session_state:
+        st.session_state['temp_rc'] = None
 
     # --- NAVIGATION ---
     st.sidebar.divider()
-    mode = st.sidebar.radio("Select Action:", ["📈 Daily Sales (Out)", "📦 Add New Stock (In)", "📊 Inventory Dashboard", "🔮 Weekly Sales Forecast"])
+    mode = st.sidebar.radio("Select Action:", [
+        "📈 Daily Sales (Out)", 
+        "📦 Add New Stock (In)", 
+        "📊 Inventory Dashboard", 
+        "🔮 Weekly Sales Forecast",
+        "📑 Smart Procurement (Rate Cards)" # <--- Updated this line
+    ])
 
     # --- ADMINISTRATIVE RESET SWITCH ---
     st.sidebar.divider()
@@ -592,6 +600,103 @@ if api_key:
 
             if st.session_state['latest_email']:
                 st.markdown(st.session_state['latest_email'])
+            # --- MODE: SMART PROCUREMENT (RATE CARDS) ---
+    elif mode == "📑 Smart Procurement (Rate Cards)":
+        st.header("📑 Upload Supplier Rate Cards")
+        st.info("Upload your rate cards exactly like you upload daily sales.")
+        
+        # 1. Capture the Supplier Details & Transport
+        st.subheader("1. Supplier Details")
+        col1, col2, col3 = st.columns(3)
+        supplier_name = col1.text_input("Supplier Name", placeholder="e.g., Raju Traders")
+        distance_km = col2.number_input("Distance (km)", value=5.0)
+        transport_rate = col3.number_input("Transport Cost (₹ per km)", value=15.0)
+        
+        st.divider()
+        st.subheader("2. Upload Rate Data")
+        
+        # 2. The exact same UI pattern as Inventory/Sales
+        rc_option = st.selectbox(
+            'How are you uploading this rate card?',
+            ('Manual Text Entry', 'Image/PDF of Rate Card')
+        )
+        
+        rc_data_to_process = None
+        uploaded_rc_file = None
+        
+        if rc_option == 'Manual Text Entry':
+            rc_data_to_process = st.text_area("Paste Rate Card Items:", height=150, placeholder="Example: Sugar 40, Maggi 22...")
+        elif rc_option == 'Image/PDF of Rate Card':
+            uploaded_rc_file = st.file_uploader("Upload Rate Card Photo", type=['png', 'jpg', 'jpeg'])
+            if uploaded_rc_file:
+                st.image(uploaded_rc_file, caption="Rate Card Preview", width=300)
+                
+        # 3. Extract Button
+        if st.button("🔍 Extract Rate Card"):
+            if not supplier_name:
+                st.warning("⚠️ Please enter a Supplier Name at the top first!")
+            elif rc_data_to_process or uploaded_rc_file:
+                with st.spinner('AI is extracting prices...'):
+                    rc_prompt = """You are a Procurement Agent. Extract the items and prices from this rate card.
+                    Output ONLY a raw JSON array of objects.
+                    Keys MUST be exactly: "item_name", "price_per_unit".
+                    RULES:
+                    1. Output ONLY valid JSON. Do not wrap in markdown.
+                    2. Normalization: Standard English names (e.g. "Sugar", "Atta").
+                    3. Make sure prices are raw numbers, not strings with currency symbols.
+                    """
+                    try:
+                        if rc_option == 'Image/PDF of Rate Card' and uploaded_rc_file:
+                            from PIL import Image
+                            img = Image.open(uploaded_rc_file)
+                            response = safe_generate([rc_prompt, img])
+                        else:
+                            response = safe_generate([rc_prompt, rc_data_to_process])
+                            
+                        if response:
+                            # Save the AI response and the supplier info to temporary memory
+                            st.session_state['temp_rc'] = response.text
+                            st.session_state['temp_sup_name'] = supplier_name
+                            st.session_state['temp_dist'] = distance_km
+                    except Exception as e:
+                        st.error(f"Error during AI extraction: {e}")
+            else:
+                st.warning("Please provide rate card data first.")
+
+        # 4. Preview and Save to Database
+        if st.session_state.get('temp_rc'):
+            st.divider()
+            st.subheader("✅ Extracted Prices (Preview)")
+            st.markdown(st.session_state['temp_rc'])
+            
+            if st.button("💾 Save to Supplier Database"):
+                try:
+                    import json 
+                    import sqlite3
+                    
+                    items = json.loads(st.session_state['temp_rc'])
+                    
+                    conn = sqlite3.connect('shop_data.db')
+                    c = conn.cursor()
+                    
+                    # Delete old prices from this specific supplier so we don't get duplicates if you re-upload
+                    c.execute("DELETE FROM suppliers WHERE supplier_name = ?", (st.session_state['temp_sup_name'],))
+                    
+                    for item in items:
+                        c.execute('''INSERT INTO suppliers (supplier_name, item_name, price_per_unit, distance_km, contact_info)
+                                     VALUES (?, ?, ?, ?, ?)''', 
+                                  (st.session_state['temp_sup_name'], item.get('item_name', 'Unknown'), 
+                                   float(item.get('price_per_unit', 0)), st.session_state['temp_dist'], "WhatsApp"))
+                    
+                    conn.commit()
+                    conn.close()
+                    
+                    st.session_state['temp_rc'] = None
+                    st.success(f"✅ {st.session_state['temp_sup_name']} saved successfully!")
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Error saving to database. The AI didn't format the JSON correctly. Error: {e}")
 
 else:
     st.warning("Please enter your API Key to begin.")
