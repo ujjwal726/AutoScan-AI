@@ -8,10 +8,11 @@ from PIL import Image
 import sqlite3
 
 st.set_page_config(page_title="End-to-End Inventory System", layout="wide")
-# --- DATABASE SETUP ---
+#--- DATABASE SETUP ---
 def init_db():
     # This creates a file named 'shop_data.db' in your folder. 
     # If it already exists, it just connects to it.
+    import sqlite3
     conn = sqlite3.connect('shop_data.db')
     c = conn.cursor()
     
@@ -40,6 +41,18 @@ def init_db():
             unit_price REAL,
             total REAL,
             payment_mode TEXT
+        )
+    ''')
+
+    # --- NEW: Create a SUPPLIERS table ---
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS suppliers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            supplier_name TEXT,
+            item_name TEXT,
+            price_per_unit REAL,
+            distance_km REAL,
+            contact_info TEXT
         )
     ''')
     
