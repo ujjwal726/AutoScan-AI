@@ -193,6 +193,69 @@ if api_key:
     if 'inventory' not in st.session_state:
         st.session_state['inventory'] = {} 
 
+    # --- NEW: DEVELOPER SIMULATION BUTTON ---
+    if st.sidebar.button("🧪 Run 30-Day Kirana Simulation", help="Injects 30 days of fake data for testing."):
+        import random
+        from datetime import datetime, timedelta
+        import sqlite3
+
+        with st.spinner("Building time machine and generating 30 days of data..."):
+            try:
+                conn = sqlite3.connect('shop_data.db')
+                c = conn.cursor()
+                
+                # Wipe old test data
+                c.execute("DELETE FROM inventory")
+                c.execute("DELETE FROM sales")
+                
+                catalog = [
+                    ("Aashirvaad Atta 5kg", "Grains", 180, 210),
+                    ("Fortune Sunflower Oil 1L", "Grocery", 110, 135),
+                    ("Tata Salt 1kg", "Grocery", 18, 24),
+                    ("Maggi 140g", "Grocery", 22, 28),
+                    ("Surf Excel Matic 1kg", "Household", 170, 205),
+                    ("Amul Butter 100g", "Dairy", 45, 54),
+                    ("Parle-G 250g", "Snacks", 20, 25),
+                    ("Red Label Tea 250g", "Grocery", 120, 140),
+                    ("Sugar 1kg", "Grocery", 38, 42),
+                    ("Lifebuoy Soap", "Personal Care", 25, 30)
+                ]
+                
+                start_date = datetime.now() - timedelta(days=30)
+                
+                # Buy initial stock
+                for item in catalog:
+                    name, category, buy_price, _ = item
+                    qty = random.randint(50, 200)
+                    c.execute('''INSERT INTO inventory (date, item_name, category, quantity, unit_price, total, payment_mode)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?)''', 
+                              (start_date.strftime("%Y-%m-%d"), name, category, qty, buy_price, qty * buy_price, 'Cash'))
+                              
+                # Simulate 30 days of sales with occasional Udhari
+                payment_methods = ['UPI', 'Cash', 'UPI', 'Cash', 'Credit (Udhari)']
+                
+                for day_offset in range(30):
+                    current_date = start_date + timedelta(days=day_offset)
+                    date_str = current_date.strftime("%Y-%m-%d")
+                    is_weekend = current_date.weekday() >= 5
+                    num_transactions = random.randint(15, 30) if is_weekend else random.randint(5, 15)
+                    
+                    for _ in range(num_transactions):
+                        item = random.choice(catalog)
+                        name, category, _, sell_price = item
+                        qty_sold = random.randint(1, 3)
+                        pay_mode = random.choice(payment_methods)
+                        c.execute('''INSERT INTO sales (date, item_name, category, quantity, unit_price, total, payment_mode)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?)''', 
+                                  (date_str, name, category, qty_sold, sell_price, qty_sold * sell_price, pay_mode))
+
+                conn.commit()
+                conn.close()
+                st.sidebar.success("✅ 30 Days of Kirana Data Injected!")
+                st.rerun() # Refresh the screen to show the new data
+            except Exception as e:
+                st.sidebar.error(f"Error running simulation: {e}")
+
     # --- MODE: STOCK IN ---
     if mode == "📦 Add New Stock (In)":
         st.header("📦 Inventory Intake (Stock-In)")
