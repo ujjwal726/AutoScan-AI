@@ -5,8 +5,50 @@ from groq import Groq
 import anthropic # Added for Claude integration
 import pandas as pd
 from PIL import Image
+import sqlite3
 
 st.set_page_config(page_title="End-to-End Inventory System", layout="wide")
+# --- DATABASE SETUP ---
+def init_db():
+    # This creates a file named 'shop_data.db' in your folder. 
+    # If it already exists, it just connects to it.
+    conn = sqlite3.connect('shop_data.db')
+    c = conn.cursor()
+    
+    # Create an INVENTORY table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            item_name TEXT,
+            category TEXT,
+            quantity REAL,
+            unit_price REAL,
+            total REAL,
+            payment_mode TEXT
+        )
+    ''')
+    
+    # Create a SALES table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            item_name TEXT,
+            category TEXT,
+            quantity REAL,
+            unit_price REAL,
+            total REAL,
+            payment_mode TEXT
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# Run this function every time the app starts
+init_db()
+# ----------------------
 
 # --- 1. MULTI-PROVIDER AUTHENTICATION & DISCOVERY ---
 st.sidebar.title("🔐 System Access")
