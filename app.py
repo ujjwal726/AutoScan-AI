@@ -825,7 +825,87 @@ if api_key:
 
         except Exception as e:
             st.error(f"⚠️ Error loading dashboard: {e}")
-
+    # --- 7. FINAL ORDER GENERATION (THE BRIDGE) ---
+        st.divider()
+        st.header("🚀 Final Step: Smart Purchase Orders")
+        st.info("Automatically merging your Weekly Forecast with your Cheapest Suppliers.")
+        
+        try:
+            import pandas as pd
+            import sqlite3
+            import urllib.parse
+            
+            conn = sqlite3.connect('shop_data.db')
+            df_inv = pd.read_sql_query("SELECT * FROM inventory", conn)
+            df_sal = pd.read_sql_query("SELECT * FROM sales", conn)
+            df_sup = pd.read_sql_query("SELECT * FROM suppliers", conn)
+            conn.close()
+            
+            # We need all three pieces of data to do this math
+            if df_inv.empty or df_sal.empty or df_sup.empty:
+                st.warning("⚠️ Need Inventory, Sales, AND Supplier data to generate final orders.")
+            else:
+                # 1. FORECAST MATH (What do we need to buy?)
+                in_sum = df_inv.groupby('item_name')['quantity'].sum().reset_index().rename(columns={'quantity': 'Total_In'})
+                out_sum = df_sal.groupby('item_name')['quantity'].sum().reset_index().rename(columns={'quantity': 'Total_Out'})
+                
+                df_forecast = pd.merge(in_sum, out_sum, on='item_name', how='left').fillna(0)
+                df_forecast['Remaining'] = df_forecast['Total_In'] - df_forecast['Total_Out']
+                
+                days_active = df_sal['date'].nunique() if df_sal['date'].nunique() > 0 else 1
+                df_forecast['Daily_Velocity'] = df_forecast['Total_Out'] / days_active
+                
+                # Next 7 Days Demand + 15% Safety Stock
+                df_forecast['Demand_7D'] = (df_forecast['Daily_Velocity'] * 7 * 1.15).round(0)
+                df_forecast['Qty_to_Order'] = (df_forecast['Demand_7D'] - df_forecast['Remaining']).clip(lower=0)
+                
+                # Filter out items we don't need to buy
+                items_needed = df_forecast[df_forecast['Qty_to_Order'] > 0]
+                
+                if items_needed.empty:
+                    st.success("🟢 Your stock levels are perfectly healthy! No orders needed this week.")
+                else:
+                    # 2. PROCUREMENT MATH (Who is the cheapest?)
+                    cheapest_idx = df_sup.groupby('item_name')['price_per_unit'].idxmin()
+                    cheapest_sup = df_sup.loc[cheapest_idx]
+                    
+                    # 3. THE BRIDGE (Merge needed items with cheapest suppliers)
+                    final_orders = pd.merge(items_needed, cheapest_sup, on='item_name', how='inner')
+                    
+                    if final_orders.empty:
+                        st.warning("You need to restock items, but your uploaded suppliers don't sell them!")
+                    else:
+                        st.subheader("🛒 Your Actionable Orders")
+                        
+                        # Group by supplier to avoid multiple delivery fees
+                        grouped_final = final_orders.groupby('supplier_name')
+                        
+                        for supplier, items in grouped_final:
+                            dist = items.iloc[0]['distance_km']
+                            trip_cost = dist * st.session_state.get('transport_rate', 2.0)
+                            
+                            with st.expander(f"📦 Send Order to {supplier} (Trip Cost: ₹{trip_cost})", expanded=True):
+                                # Show the exact quantities
+                                display_df = items[['item_name', 'Qty_to_Order', 'price_per_unit']].copy()
+                                display_df.columns = ['Item Name', 'Qty Needed', 'Cheapest Rate (₹)']
+                                st.dataframe(display_df, hide_index=True)
+                                
+                                # --- 4. GENERATE DEEP LINKS WITH EXACT QUANTITIES ---
+                                order_text = f"Hello {supplier},\n\nPlease prepare the following order for pickup:\n\n"
+                                for _, row in items.iterrows():
+                                    order_text += f"- {int(row['Qty_to_Order'])} units of {row['item_name']}\n"
+                                order_text += "\nThank you!"
+                                
+                                encoded_text = urllib.parse.quote(order_text)
+                                wa_url = f"https://wa.me/?text={encoded_text}"
+                                gmail_url = f"mailto:{items.iloc[0]['contact_info']}?subject=New%20Restock%20Order&body={encoded_text}"
+                                
+                                c1, c2 = st.columns(2)
+                                c1.link_button("💬 Send via WhatsApp", wa_url, use_container_width=True)
+                                c2.link_button("📧 Send via Gmail", gmail_url, use_container_width=True)
+                                
+        except Exception as e:
+            st.error(f"⚠️ Error generating final orders: {e}")
             
 else:
     st.warning("Please enter your API Key to begin.")
