@@ -330,15 +330,37 @@
             }
         }
 
+        // --- Save to Database Logic (Fixed Auto-Update!) ---
         async function confirmAndSave() {
-            const saveBtn = document.getElementById('save-btn'); saveBtn.disabled = true; saveBtn.innerText = "💾 Saving...";
+            const saveBtn = document.getElementById('save-btn'); 
+            saveBtn.disabled = true; 
+            saveBtn.innerText = "💾 Saving...";
+            
             try {
-                const response = await fetch(`${API_BASE_URL}/api/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'stock', items: globalExtractedData }) });
+                // 1. Send the data to the Python Brain
+                const response = await fetch(`${API_BASE_URL}/api/save`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ mode: 'stock', items: globalExtractedData }) 
+                });
+                
                 if (!response.ok) throw new Error("Database save failed");
-                alert("✅ Success! The data has been permanently saved.");
-                closeTransactionModal(); fetchDashboardData(); 
-            } catch (error) { alert("❌ Error: " + error.message); } 
-            finally { saveBtn.disabled = false; saveBtn.innerText = "Confirm & Save to Database"; }
+                
+                // 2. FORCE the dashboard to fetch the new data and wait until it finishes
+                await fetchDashboardData(); 
+                
+                // 3. ONLY close the modal and alert the user after the background is updated
+                closeTransactionModal(); 
+                setTimeout(() => {
+                    alert("✅ Success! The data has been saved and the dashboard is updated.");
+                }, 100);
+
+            } catch (error) { 
+                alert("❌ Error: " + error.message); 
+            } finally { 
+                saveBtn.disabled = false; 
+                saveBtn.innerText = "Confirm & Save to Database"; 
+            }
         }
 
         // --- THE FIX: PARALLEL FETCHING WITH PROMISE.ALL ---
