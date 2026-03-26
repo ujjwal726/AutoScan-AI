@@ -55,22 +55,22 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
                     <span class="text-slate-500 text-sm font-medium mb-1">Total Investment</span>
-                    <span class="text-3xl font-bold text-slate-800">₹45,200</span>
+                    <span class="text-3xl font-bold text-slate-800" id="total-investment">Loading...</span>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
                     <span class="text-slate-500 text-sm font-medium mb-1">Total Revenue</span>
-                    <span class="text-3xl font-bold text-slate-800">₹52,850</span>
+                    <span class="text-3xl font-bold text-slate-800" id="total-revenue">Loading...</span>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
                     <span class="text-slate-500 text-sm font-medium mb-1">Current Balance</span>
-                    <span class="text-3xl font-bold text-emerald-600">+ ₹7,650</span>
+                    <span class="text-3xl font-bold text-emerald-600" id="current-balance">Loading...</span>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border-t-4 border-t-red-500 border-x border-b border-slate-100 p-6 flex flex-col relative overflow-hidden">
                     <div class="absolute top-0 right-0 p-4 opacity-10">
                         <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
                     <span class="text-slate-500 text-sm font-medium mb-1">Pending Udhari</span>
-                    <span class="text-3xl font-bold text-red-600">₹3,420</span>
+                    <span class="text-3xl font-bold text-red-600" id="pending-udhari">Loading...</span>
                 </div>
             </div>
 
@@ -89,30 +89,9 @@
                                 <th class="px-6 py-4 font-medium">Status</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100 text-slate-700">
-                            <tr class="hover:bg-slate-50 transition-colors">
-                                <td class="px-6 py-4 font-medium text-slate-900">Aashirvaad Atta 5kg</td>
-                                <td class="px-6 py-4 text-slate-500">Grains</td>
-                                <td class="px-6 py-4 font-semibold">42 units</td>
-                                <td class="px-6 py-4">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Healthy</span>
-                                </td>
-                            </tr>
-                            <tr class="hover:bg-slate-50 transition-colors">
-                                <td class="px-6 py-4 font-medium text-slate-900">Fortune Sunflower Oil 1L</td>
-                                <td class="px-6 py-4 text-slate-500">Grocery</td>
-                                <td class="px-6 py-4 font-semibold text-red-600">4 units</td>
-                                <td class="px-6 py-4">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Low Stock</span>
-                                </td>
-                            </tr>
-                            <tr class="hover:bg-slate-50 transition-colors">
-                                <td class="px-6 py-4 font-medium text-slate-900">Tata Salt 1kg</td>
-                                <td class="px-6 py-4 text-slate-500">Grocery</td>
-                                <td class="px-6 py-4 font-semibold">18 units</td>
-                                <td class="px-6 py-4">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Reorder Soon</span>
-                                </td>
+                        <tbody class="divide-y divide-slate-100 text-slate-700" id="inventory-table-body">
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center text-slate-500 font-medium">Loading stock data...</td>
                             </tr>
                         </tbody>
                     </table>
