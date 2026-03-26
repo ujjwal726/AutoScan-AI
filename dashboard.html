@@ -78,7 +78,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-slate-700" id="inventory-table-body">
-                            <tr><td colspan="4" class="px-6 py-4 text-center text-slate-500">Loading stock data...</td></tr>
+                            <tr><td colspan="4" class="px-6 py-4 text-center text-slate-500" id="stock-loading">Loading stock data...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -102,7 +102,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-slate-700" id="ledger-table-body">
-                            <tr><td colspan="7" class="px-6 py-4 text-center text-slate-500">Loading ledger data...</td></tr>
+                            <tr><td colspan="7" class="px-6 py-4 text-center text-slate-500" id="ledger-loading">Loading ledger data...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -183,7 +183,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="preview-table-body" class="divide-y divide-slate-100 bg-white">
-                                    </tbody>
+                                </tbody>
                             </table>
                         </div>
                         <div class="flex space-x-3 pt-2">
@@ -199,7 +199,6 @@
     <script>
         const API_BASE_URL = "https://autoscan-ai-psz1.onrender.com"; 
         
-        // --- Global State Management ---
         let globalProvider = localStorage.getItem('kirana_api_provider') || 'Google Gemini';
         let globalApiKey = localStorage.getItem('kirana_api_key');
         let globalModel = localStorage.getItem('kirana_api_model');
@@ -218,7 +217,6 @@
             }
         }
 
-        // --- Settings Modal Control ---
         const settingsModal = document.getElementById('settings-modal');
         const settingsContent = document.getElementById('settings-content');
 
@@ -276,7 +274,6 @@
             checkSystemReady(); closeSettingsModal(); alert("✅ AI Settings securely saved to your browser!");
         }
 
-        // --- Transaction Modal Control ---
         const transModal = document.getElementById('transaction-modal');
         const transContent = document.getElementById('transaction-content');
 
@@ -291,7 +288,6 @@
             transModal.classList.add('opacity-0'); transContent.classList.remove('scale-100'); transContent.classList.add('scale-95');
             setTimeout(() => { 
                 transModal.classList.add('hidden'); document.getElementById('transaction-form').reset(); globalExtractedData = null; 
-                // Reset extraction buttons safely
                 const extractBtn = document.getElementById('extract-btn');
                 extractBtn.disabled = false; extractBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 document.getElementById('extract-text').innerText = "Extract Data with AI";
@@ -303,7 +299,6 @@
 
         function backToForm() { document.getElementById('preview-section').classList.add('hidden'); document.getElementById('transaction-form').classList.remove('hidden'); }
 
-        // --- Extract Data Logic ---
         async function extractTransaction() {
             const fileInput = document.getElementById('receipt-file');
             const textInput = document.getElementById('manual-entry').value;
@@ -335,7 +330,6 @@
             }
         }
 
-        // --- Save to Database Logic ---
         async function confirmAndSave() {
             const saveBtn = document.getElementById('save-btn'); saveBtn.disabled = true; saveBtn.innerText = "💾 Saving...";
             try {
@@ -347,25 +341,34 @@
             finally { saveBtn.disabled = false; saveBtn.innerText = "Confirm & Save to Database"; }
         }
 
-        // --- NEW: Master Fetch Logic (Metrics + Stock + Ledger) ---
+        // --- THE FIX: PARALLEL FETCHING WITH PROMISE.ALL ---
         async function fetchDashboardData() {
             try {
-                // 1. Fetch Metrics
-                const metricsResponse = await fetch(`${API_BASE_URL}/api/metrics`);
-                const metrics = await metricsResponse.json();
-                const formatR = (num) => num.toLocaleString('en-IN');
+                document.getElementById('stock-loading').innerText = "Loading data...";
+                document.getElementById('ledger-loading').innerText = "Loading data...";
 
+                // Fire all 3 requests to Render at the EXACT SAME TIME
+                const [metricsRes, stockRes, ledgerRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/api/metrics`),
+                    fetch(`${API_BASE_URL}/api/stock`),
+                    fetch(`${API_BASE_URL}/api/transactions`)
+                ]);
+
+                // Wait for all 3 to convert to JSON
+                const metrics = await metricsRes.json();
+                const stockData = await stockRes.json();
+                const ledgerData = await ledgerRes.json();
+
+                // 1. Update Metrics UI
+                const formatR = (num) => num.toLocaleString('en-IN');
                 document.getElementById('total-investment').innerText = `₹${formatR(metrics.investment)}`;
                 document.getElementById('total-revenue').innerText = `₹${formatR(metrics.revenue)}`;
                 document.getElementById('current-balance').innerText = `${metrics.balance >= 0 ? '+ ₹' : '- ₹'}${formatR(Math.abs(metrics.balance))}`;
                 document.getElementById('pending-udhari').innerText = `₹${formatR(metrics.udhari)}`;
 
-                // 2. Fetch Aggregated Stock
-                const stockResponse = await fetch(`${API_BASE_URL}/api/stock`);
-                const stockData = await stockResponse.json();
+                // 2. Update Stock UI
                 const stockBody = document.getElementById('inventory-table-body');
                 stockBody.innerHTML = ''; 
-
                 stockData.forEach(item => {
                     let badge = item.Status === 'Healthy' ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Healthy</span>` :
                                 item.Status === 'Reorder Soon' ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Reorder Soon</span>` :
@@ -381,12 +384,9 @@
                     `);
                 });
 
-                // 3. NEW: Fetch Raw Transactions (The Ledger!)
-                const ledgerResponse = await fetch(`${API_BASE_URL}/api/transactions`);
-                const ledgerData = await ledgerResponse.json();
+                // 3. Update Ledger UI
                 const ledgerBody = document.getElementById('ledger-table-body');
                 ledgerBody.innerHTML = '';
-
                 if (ledgerData.length === 0) {
                     ledgerBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-slate-500 italic">No recent transactions found. Add one above!</td></tr>`;
                 } else {
@@ -407,6 +407,8 @@
                 }
             } catch (e) {
                 console.error("Dashboard Fetch Error:", e);
+                document.getElementById('stock-loading').innerText = "⚠️ Failed to load data.";
+                document.getElementById('ledger-loading').innerText = "⚠️ Failed to load data.";
             }
         }
 
