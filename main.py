@@ -1,222 +1,197 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import sqlite3
+from sqlalchemy import create_engine, Column, Integer, String, Float, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 import pandas as pd
 import json
 import io
+import os
+import random
+from datetime import datetime, timedelta
 from typing import Optional, List
-
-# AI Providers
 import google.generativeai as genai
 from groq import Groq
 from PIL import Image
 
-# --- 1. INITIALIZATION & DATABASE ---
-app = FastAPI(title="KiranaAI Backend API")
+# --- CLOUD DATABASE CONNECTION ---
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-def init_db():
-    conn = sqlite3.connect('shop_data.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS inventory (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, item_name TEXT, category TEXT, 
-        quantity REAL, unit_price REAL, total REAL, payment_mode TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS sales (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, item_name TEXT, category TEXT, 
-        quantity REAL, unit_price REAL, total REAL, payment_mode TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS suppliers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, supplier_name TEXT, item_name TEXT, 
-        price_per_unit REAL, distance_km REAL, contact_info TEXT)''')
-    conn.commit()
-    conn.close()
+# --- DATABASE MODELS ---
+class Inventory(Base):
+    __tablename__ = "inventory"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String)
+    item_name = Column(String)
+    category = Column(String)
+    quantity = Column(Float)
+    unit_price = Column(Float)
+    total = Column(Float)
+    payment_mode = Column(String)
 
-init_db()
+class Sales(Base):
+    __tablename__ = "sales"
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(String)
+    item_name = Column(String)
+    category = Column(String)
+    quantity = Column(Float)
+    unit_price = Column(Float)
+    total = Column(Float)
+    payment_mode = Column(String)
 
-def get_db():
-    return sqlite3.connect('shop_data.db')
+class Supplier(Base):
+    __tablename__ = "suppliers"
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_name = Column(String)
+    item_name = Column(String)
+    price_per_unit = Column(Float)
+    distance_km = Column(Float)
+    contact_info = Column(String)
 
-# --- 2. DYNAMIC MODEL DISCOVERY ---
-class ModelRequest(BaseModel):
-    provider: str
-    api_key: str
+Base.metadata.create_all(bind=engine)
 
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# --- AI CORE ---
 @app.post("/api/models")
-def discover_models(payload: ModelRequest):
+def discover_models(payload: dict):
     try:
-        if payload.provider == "Google Gemini":
-            genai.configure(api_key=payload.api_key)
-            # Find all models that support generating content
-            models = [m.name.split('/')[-1] for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            return {"models": models}
-            
-        elif payload.provider == "Groq":
-            client = Groq(api_key=payload.api_key)
-            raw_models = client.models.list()
-            # Filter for fast Llama/Mixtral/Gemma models
-            models = sorted([m.id for m in raw_models.data if 'llama' in m.id or 'mixtral' in m.id or 'gemma' in m.id])
-            return {"models": models}
-            
+        if payload['provider'] == "Google Gemini":
+            genai.configure(api_key=payload['api_key'])
+            return {"models": [m.name.split('/')[-1] for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]}
+        elif payload['provider'] == "Groq":
+            client = Groq(api_key=payload['api_key'])
+            return {"models": [m.id for m in client.models.list().data]}
         return {"models": []}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid API Key or Connection Error: {str(e)}")
+    except Exception as e: raise HTTPException(status_code=400, detail=str(e))
 
-
-# --- 3. AI EXTRACTION ENGINE (THE OCR ROUTE) ---
 @app.post("/api/extract")
-async def extract_data(
-    mode: str = Form(...), # "stock", "sales", or "rate_card"
-    provider: str = Form(...),
-    api_key: str = Form(...),
-    model_name: str = Form(...),
-    text_data: Optional[str] = Form(None),
-    file: Optional[UploadFile] = File(None)
-):
-    if mode in ["stock", "sales"]:
-        system_prompt = """Extract the data and output ONLY a raw JSON array of objects.
-        Each object MUST have exact keys: "date", "item_name", "category", "quantity", "unit_price", "total", "payment_mode".
-        Output ONLY valid JSON. Normalization: Standard English names. Categories: [Grocery, Dairy, Personal Care, Household, Grains].
-        quantity, unit_price, and total MUST be numbers."""
-    else:
-        system_prompt = """Extract items and prices from this rate card. Output ONLY a raw JSON array of objects.
-        Keys MUST be exactly: "item_name", "price_per_unit".
-        Output ONLY valid JSON. Normalization: Standard English names. Prices must be numbers."""
-
+async def extract_data(mode: str = Form(...), provider: str = Form(...), api_key: str = Form(...), 
+                       model_name: str = Form(...), text_data: Optional[str] = Form(None), 
+                       file: Optional[UploadFile] = File(None)):
+    
+    system_prompt = f"Extract {mode} data. Output ONLY raw JSON array. Keys: date, item_name, category, quantity, unit_price, total, payment_mode."
+    if mode == "suppliers":
+        system_prompt = "Extract supplier items. Output ONLY raw JSON array. Keys: item_name, price_per_unit."
+    
     contents = [system_prompt]
-    if text_data:
-        contents.append(text_data)
-    elif file:
-        image_bytes = await file.read()
-        contents.append(Image.open(io.BytesIO(image_bytes)))
-    else:
-        raise HTTPException(status_code=400, detail="Must provide either text_data or a file.")
+    if text_data: contents.append(text_data)
+    elif file: contents.append(Image.open(io.BytesIO(await file.read())))
 
     try:
-        result_text = ""
         if provider == "Google Gemini":
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(contents)
-            result_text = response.text
-            
-        elif provider == "Groq":
+            res = genai.GenerativeModel(model_name).generate_content(contents)
+            text = res.text
+        else:
             client = Groq(api_key=api_key)
-            response = client.chat.completions.create(model=model_name, messages=[{"role": "user", "content": str(contents)}])
-            result_text = response.choices[0].message.content
+            res = client.chat.completions.create(model=model_name, messages=[{"role": "user", "content": str(contents)}])
+            text = res.choices[0].message.content
+        return json.loads(text.replace("```json", "").replace("```", "").strip())
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
-        clean_json = result_text.replace("```json", "").replace("```", "").strip()
-        return json.loads(clean_json)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Processing Error: {str(e)}")
-
-# --- 4. DATABASE WRITE OPERATIONS ---
-class SavePayload(BaseModel):
-    mode: str
-    items: List[dict]
-    supplier_name: Optional[str] = None
-    distance_km: Optional[float] = None
-
+# --- DATA OPERATIONS ---
 @app.post("/api/save")
-def save_data(payload: SavePayload):
-    conn = get_db()
-    c = conn.cursor()
+def save_data(payload: dict):
+    db = SessionLocal()
     try:
-        if payload.mode == "stock" or payload.mode == "sales":
-            table = payload.mode # "stock" saves to inventory temporarily for this example logic, lets keep it strictly as inventory
-            table_name = 'inventory' if payload.mode == 'stock' else 'sales'
-            for item in payload.items:
-                c.execute(f'''INSERT INTO {table_name} (date, item_name, category, quantity, unit_price, total, payment_mode)
-                             VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                          (item.get('date', 'Today'), item.get('item_name'), item.get('category', 'Other'), 
-                           item.get('quantity', 0), item.get('unit_price', 0), item.get('total', 0), item.get('payment_mode', 'Cash')))
-        elif payload.mode == "rate_card":
-            c.execute("DELETE FROM suppliers WHERE supplier_name = ?", (payload.supplier_name,))
-            for item in payload.items:
-                c.execute('''INSERT INTO suppliers (supplier_name, item_name, price_per_unit, distance_km, contact_info)
-                             VALUES (?, ?, ?, ?, ?)''',
-                          (payload.supplier_name, item.get('item_name'), float(item.get('price_per_unit', 0)), payload.distance_km, "WhatsApp"))
-        conn.commit()
-        return {"status": "success", "message": "Data saved to database."}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+        if payload['mode'] == 'stock':
+            for item in payload['items']: db.add(Inventory(**item))
+        elif payload['mode'] == 'sales':
+            for item in payload['items']: db.add(Sales(**item))
+        elif payload['mode'] == 'suppliers':
+            for item in payload['items']:
+                db.add(Supplier(supplier_name=payload['supplier_name'], distance_km=payload['distance_km'], 
+                                item_name=item['item_name'], price_per_unit=item['price_per_unit'], contact_info=payload.get('contact', 'WA')))
+        db.commit()
+        return {"status": "success"}
+    finally: db.close()
 
-# --- 5. THE KIRANA MATH ENGINES (READ OPERATIONS) ---
-@app.get("/api/metrics")
-def get_dashboard_metrics():
+@app.get("/api/dashboard")
+def get_dashboard_data():
+    inv = pd.read_sql("SELECT * FROM inventory", engine)
+    sales = pd.read_sql("SELECT * FROM sales", engine)
+    metrics = {"investment": float(inv['total'].sum()) if not inv.empty else 0,
+               "revenue": float(sales['total'].sum()) if not sales.empty else 0}
+    metrics["balance"] = metrics["revenue"] - metrics["investment"]
+    metrics["udhari"] = float(sales[sales['payment_mode'].str.contains('credit|udhari', case=False, na=False)]['total'].sum()) if not sales.empty else 0
+    
+    stock_sum = (inv.groupby('item_name')['quantity'].sum() if not inv.empty else pd.Series()) - (sales.groupby('item_name')['quantity'].sum() if not sales.empty else 0)
+    return {"metrics": metrics, "stock": stock_sum.fillna(0).to_dict()}
+
+# --- KIRANA INTELLIGENCE ---
+@app.get("/api/forecast")
+def get_forecast():
+    sales = pd.read_sql("SELECT * FROM sales", engine)
+    inv = pd.read_sql("SELECT * FROM inventory", engine)
+    if sales.empty or inv.empty: return []
+    sales['date'] = pd.to_datetime(sales['date'])
+    cutoff = sales['date'].max() - pd.Timedelta(days=7)
+    
+    out_total = sales.groupby('item_name')['quantity'].sum()
+    out_recent = sales[sales['date'] >= cutoff].groupby('item_name')['quantity'].sum()
+    in_total = inv.groupby('item_name')['quantity'].sum()
+
+    results = []
+    for item in in_total.index:
+        total_s = out_total.get(item, 0)
+        recent_s = out_recent.get(item, 0)
+        remaining = in_total[item] - total_s
+        vel = ((recent_s / 7) * 0.7) + (((total_s - recent_s) / 23) * 0.3)
+        demand = round(vel * 7 * 1.15)
+        results.append({"item_name": item, "current_stock": remaining, "demand_7d": demand, "suggested_order": max(0, demand - remaining)})
+    return results
+
+@app.get("/api/smart-order")
+def get_smart_orders():
+    forecast = get_forecast()
+    suppliers = pd.read_sql("SELECT * FROM suppliers", engine)
+    if not forecast or suppliers.empty: return []
+
+    # Landed Cost Math: Base Price + (Dist * 2.0 transport factor)
+    suppliers['landed'] = suppliers['price_per_unit'] + (suppliers['distance_km'] * 2.0)
+    best_suppliers = suppliers.loc[suppliers.groupby('item_name')['landed'].idxmin()]
+
+    orders = []
+    for f in forecast:
+        if f['suggested_order'] > 0:
+            match = best_suppliers[best_suppliers['item_name'] == f['item_name']]
+            if not match.empty:
+                orders.append({
+                    "item": f['item_name'], "qty": f['suggested_order'],
+                    "supplier": match.iloc[0]['supplier_name'], "price": match.iloc[0]['price_per_unit'],
+                    "contact": match.iloc[0]['contact_info']
+                })
+    return orders
+
+@app.post("/api/simulate")
+def run_simulation():
+    db = SessionLocal()
     try:
-        conn = get_db()
-        df_inventory = pd.read_sql_query("SELECT * FROM inventory", conn)
-        df_sales = pd.read_sql_query("SELECT * FROM sales", conn)
-        conn.close()
+        db.query(Inventory).delete(); db.query(Sales).delete(); db.query(Supplier).delete()
+        items = [("Sugar", "Grocery", 38, 44), ("Atta 5kg", "Grains", 190, 220), ("Tea 250g", "Grocery", 120, 145)]
+        start_date = datetime.now() - timedelta(days=30)
+        for name, cat, buy, sell in items:
+            db.add(Inventory(date=start_date.strftime("%Y-%m-%d"), item_name=name, category=cat, quantity=200, unit_price=buy, total=200*buy, payment_mode="Cash"))
+            for i in range(30):
+                d = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+                db.add(Sales(date=d, item_name=name, category=cat, quantity=random.randint(2, 5), unit_price=sell, total=5*sell, payment_mode="Cash"))
+        db.add(Supplier(supplier_name="Nashik Mandi", item_name="Sugar", price_per_unit=37.0, distance_km=4.0, contact_info="9876543210"))
+        db.commit(); return {"status": "Simulated"}
+    finally: db.close()
 
-        total_investment = float(df_inventory['total'].sum()) if not df_inventory.empty else 0.0
-        total_revenue = float(df_sales['total'].sum()) if not df_sales.empty else 0.0
-        current_balance = total_revenue - total_investment
-
-        total_credit = 0.0
-        if not df_sales.empty:
-            credit_mask = df_sales['payment_mode'].str.contains('credit|udhari', case=False, na=False)
-            total_credit = float(df_sales.loc[credit_mask, 'total'].sum())
-
-        return {"investment": total_investment, "revenue": total_revenue, "balance": current_balance, "udhari": total_credit}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/stock")
-def get_stock_levels():
+@app.post("/api/reset")
+def reset_data():
+    db = SessionLocal()
     try:
-        conn = get_db()
-        df_inventory = pd.read_sql_query("SELECT * FROM inventory", conn)
-        df_sales = pd.read_sql_query("SELECT * FROM sales", conn)
-        conn.close()
-
-        if df_inventory.empty: return []
-
-        in_summary = df_inventory.groupby(['item_name', 'category'])['quantity'].sum().reset_index()
-        in_summary.rename(columns={'quantity': 'Total_In'}, inplace=True)
-
-        out_summary = pd.DataFrame(columns=['item_name', 'Total_Out'])
-        if not df_sales.empty:
-            out_summary = df_sales.groupby('item_name')['quantity'].sum().reset_index()
-            out_summary.rename(columns={'quantity': 'Total_Out'}, inplace=True)
-
-        dashboard_df = pd.merge(in_summary, out_summary, on='item_name', how='left').fillna(0)
-        dashboard_df['Remaining_Stock'] = dashboard_df['Total_In'] - dashboard_df['Total_Out']
-        
-        def get_status(qty):
-            if qty > 20: return "Healthy"
-            elif qty > 5: return "Reorder Soon"
-            else: return "Low Stock"
-            
-        dashboard_df['Status'] = dashboard_df['Remaining_Stock'].apply(get_status)
-        return dashboard_df[['item_name', 'category', 'Remaining_Stock', 'Status']].to_dict(orient='records')
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-@app.get("/api/transactions")
-def get_recent_transactions():
-    """Fetches the raw, unaggregated ledger history."""
-    try:
-        conn = get_db()
-        # Get the 50 most recent inventory additions, newest first
-        df_inventory = pd.read_sql_query("SELECT * FROM inventory ORDER BY id DESC LIMIT 50", conn)
-        conn.close()
-
-        # If empty, return an empty list
-        if df_inventory.empty:
-            return []
-
-        # Convert the raw database rows into a JSON list for the frontend
-        return df_inventory[['date', 'item_name', 'category', 'quantity', 'unit_price', 'total', 'payment_mode']].to_dict(orient='records')
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        db.query(Inventory).delete(); db.query(Sales).delete(); db.query(Supplier).delete()
+        db.commit(); return {"status": "Reset"}
+    finally: db.close()
