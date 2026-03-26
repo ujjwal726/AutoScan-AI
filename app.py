@@ -8,6 +8,83 @@ from PIL import Image
 import sqlite3
 
 st.set_page_config(page_title="End-to-End Inventory System", layout="wide")
+def set_modern_ui():
+    """Injects custom CSS to make Streamlit look like a premium SaaS product."""
+    st.markdown("""
+        <style>
+        /* Main background and font adjustments */
+        [data-testid="stAppViewContainer"] {
+            background-color: #F8F9FA;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Sleek Sidebar */
+        [data-testid="stSidebar"] {
+            background-color: #1E293B;
+            color: white;
+            padding-top: 2rem;
+        }
+        [data-testid="stSidebar"] * {
+            color: #F1F5F9 !important;
+        }
+        
+        /* Style the modern, clickable buttons */
+        div.stButton > button {
+            background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
+            color: white !important;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.2s ease-in-out;
+            width: 100%;
+        }
+        
+        /* Button hover animation */
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            background: linear-gradient(135deg, #4338CA 0%, #2563EB 100%);
+        }
+
+        /* Financial Metric Cards */
+        [data-testid="stMetric"] {
+            background-color: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            border-top: 4px solid #3B82F6;
+        }
+        
+        /* Make the Udhari metric pop with a red accent */
+        [data-testid="stMetric"]:nth-child(4) {
+            border-top: 4px solid #EF4444;
+        }
+
+        /* Expander/Accordion styling for the final orders */
+        [data-testid="stExpander"] {
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            margin-bottom: 1rem;
+        }
+        
+        /* Clean up standard input boxes */
+        .stTextInput>div>div>input, .stNumberInput>div>div>input {
+            border-radius: 6px;
+            border: 1px solid #CBD5E1;
+        }
+        .stTextInput>div>div>input:focus, .stNumberInput>div>div>input:focus {
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 1px #3B82F6;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+# Run the UI injection right as the app loads
+set_modern_ui()
 #--- DATABASE SETUP ---
 def init_db():
     # This creates a file named 'shop_data.db' in your folder. 
