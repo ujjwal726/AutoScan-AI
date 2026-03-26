@@ -203,3 +203,20 @@ def get_stock_levels():
         return dashboard_df[['item_name', 'category', 'Remaining_Stock', 'Status']].to_dict(orient='records')
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+@app.get("/api/transactions")
+def get_recent_transactions():
+    """Fetches the raw, unaggregated ledger history."""
+    try:
+        conn = get_db()
+        # Get the 50 most recent inventory additions, newest first
+        df_inventory = pd.read_sql_query("SELECT * FROM inventory ORDER BY id DESC LIMIT 50", conn)
+        conn.close()
+
+        # If empty, return an empty list
+        if df_inventory.empty:
+            return []
+
+        # Convert the raw database rows into a JSON list for the frontend
+        return df_inventory[['date', 'item_name', 'category', 'quantity', 'unit_price', 'total', 'payment_mode']].to_dict(orient='records')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
