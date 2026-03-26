@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kirana AI | Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { brand: { 500: '#4F46E5', 600: '#4338CA' } }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans flex h-screen overflow-hidden">
+
+    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col transition-all duration-300">
+        <div class="h-16 flex items-center px-6 border-b border-slate-800 font-bold text-xl text-white tracking-wide">
+            🛒 Kirana<span class="text-brand-500">AI</span>
+        </div>
+        <nav class="flex-1 py-4 space-y-1 px-3">
+            <a href="#" class="flex items-center px-3 py-2.5 bg-brand-500 text-white rounded-lg shadow-sm">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                Dashboard
+            </a>
+            <a href="#" class="flex items-center px-3 py-2.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                Stock In/Out
+            </a>
+            <a href="#" class="flex items-center px-3 py-2.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Procurement
+            </a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
+            <h1 class="text-2xl font-semibold text-slate-800">Inventory Overview</h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm font-medium text-slate-500">Last synced: Just now</span>
+                <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm shadow-brand-500/30 transition-all transform hover:-translate-y-0.5">
+                    + Add Transaction
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-8">
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
+                    <span class="text-slate-500 text-sm font-medium mb-1">Total Investment</span>
+                    <span class="text-3xl font-bold text-slate-800">₹45,200</span>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
+                    <span class="text-slate-500 text-sm font-medium mb-1">Total Revenue</span>
+                    <span class="text-3xl font-bold text-slate-800">₹52,850</span>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
+                    <span class="text-slate-500 text-sm font-medium mb-1">Current Balance</span>
+                    <span class="text-3xl font-bold text-emerald-600">+ ₹7,650</span>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border-t-4 border-t-red-500 border-x border-b border-slate-100 p-6 flex flex-col relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-10">
+                        <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <span class="text-slate-500 text-sm font-medium mb-1">Pending Udhari</span>
+                    <span class="text-3xl font-bold text-red-600">₹3,420</span>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-slate-800">Current Stock Levels</h2>
+                    <button class="text-brand-500 text-sm font-medium hover:text-brand-600">View Full Report &rarr;</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-sm uppercase tracking-wider">
+                                <th class="px-6 py-4 font-medium">Item Name</th>
+                                <th class="px-6 py-4 font-medium">Category</th>
+                                <th class="px-6 py-4 font-medium">In Stock</th>
+                                <th class="px-6 py-4 font-medium">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-slate-700">
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-medium text-slate-900">Aashirvaad Atta 5kg</td>
+                                <td class="px-6 py-4 text-slate-500">Grains</td>
+                                <td class="px-6 py-4 font-semibold">42 units</td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Healthy</span>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-medium text-slate-900">Fortune Sunflower Oil 1L</td>
+                                <td class="px-6 py-4 text-slate-500">Grocery</td>
+                                <td class="px-6 py-4 font-semibold text-red-600">4 units</td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Low Stock</span>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-4 font-medium text-slate-900">Tata Salt 1kg</td>
+                                <td class="px-6 py-4 text-slate-500">Grocery</td>
+                                <td class="px-6 py-4 font-semibold">18 units</td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Reorder Soon</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</body>
+</html>
