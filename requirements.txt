@@ -3,7 +3,5 @@ uvicorn
 pandas
 python-multipart
 google-generativeai
-openai
 groq
-anthropic
 pillow
