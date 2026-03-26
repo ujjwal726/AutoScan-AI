@@ -8,12 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: { brand: { 500: '#4F46E5', 600: '#4338CA' } }
-                }
-            }
+            theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] }, colors: { brand: { 500: '#4F46E5', 600: '#4338CA' } } } }
         }
     </script>
 </head>
@@ -109,25 +104,53 @@
                     </button>
                 </div>
                 <div class="p-6">
-                    <form id="transaction-form" class="space-y-5">
+                    <form id="transaction-form" class="space-y-4">
+                        
+                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">1. AI Connection Settings</h4>
+                            <div class="flex space-x-3">
+                                <div class="w-1/3">
+                                    <label class="block text-xs font-medium text-slate-700 mb-1">Provider</label>
+                                    <select id="ai-provider" class="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+                                        <option value="Google Gemini">Gemini</option>
+                                        <option value="Groq">Groq</option>
+                                    </select>
+                                </div>
+                                <div class="w-2/3">
+                                    <label class="block text-xs font-medium text-slate-700 mb-1">API Key</label>
+                                    <input type="password" id="api-key-input" class="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" placeholder="Paste Key Here...">
+                                </div>
+                            </div>
+                            <button type="button" onclick="loadModels()" id="load-models-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium py-1.5 rounded-md transition-colors">
+                                Verify Key & Load Models
+                            </button>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">Select AI Model</label>
+                                <select id="ai-model" class="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm bg-slate-100" disabled>
+                                    <option value="">Awaiting API Key...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-200">
+
+                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">2. Upload Invoice Data</h4>
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">Upload Bill/Receipt (Image or PDF)</label>
-                            <input type="file" id="receipt-file" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 transition-colors cursor-pointer" accept="image/*,.pdf">
+                            <input type="file" id="receipt-file" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 transition-colors cursor-pointer" accept="image/*,.pdf">
                         </div>
                         
-                        <div class="relative flex items-center py-2">
+                        <div class="relative flex items-center py-1">
                             <div class="flex-grow border-t border-slate-200"></div>
-                            <span class="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase font-medium tracking-wider">OR</span>
+                            <span class="flex-shrink-0 mx-4 text-slate-400 text-xs font-medium">OR</span>
                             <div class="flex-grow border-t border-slate-200"></div>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">Manual Text Entry</label>
-                            <textarea id="manual-entry" rows="3" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-shadow" placeholder="e.g., Bought 50kg Sugar at 40/kg..."></textarea>
+                            <textarea id="manual-entry" rows="2" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-shadow" placeholder="e.g., Bought 50kg Sugar at 40/kg..."></textarea>
                         </div>
 
                         <div class="pt-2">
-                            <button type="button" onclick="submitTransaction()" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-2.5 rounded-lg transition-all shadow-sm transform hover:-translate-y-0.5 flex justify-center items-center">
+                            <button type="button" onclick="submitTransaction()" id="submit-main-btn" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-2.5 rounded-lg transition-all shadow-sm transform hover:-translate-y-0.5 flex justify-center items-center opacity-50 cursor-not-allowed" disabled>
                                 <span id="submit-text">Extract & Save Data</span>
                             </button>
                         </div>
@@ -138,7 +161,6 @@
     </main>
 
     <script>
-        // FIXED: Removed the double https:// 
         const API_BASE_URL = "https://autoscan-ai-psz1.onrender.com"; 
 
         // Modal Control Functions
@@ -161,33 +183,101 @@
             setTimeout(() => {
                 modal.classList.add('hidden');
                 document.getElementById('transaction-form').reset();
+                // Reset AI dropdown on close
+                document.getElementById('ai-model').innerHTML = '<option value="">Awaiting API Key...</option>';
+                document.getElementById('ai-model').disabled = true;
+                document.getElementById('submit-main-btn').disabled = true;
+                document.getElementById('submit-main-btn').classList.add('opacity-50', 'cursor-not-allowed');
             }, 300);
         }
 
-        // The Brain Connection: Submitting Data to FastAPI
+        // NEW: Load Models from Backend
+        async function loadModels() {
+            const provider = document.getElementById('ai-provider').value;
+            const apiKey = document.getElementById('api-key-input').value;
+            const loadBtn = document.getElementById('load-models-btn');
+            const modelDropdown = document.getElementById('ai-model');
+            const submitBtn = document.getElementById('submit-main-btn');
+
+            if (!apiKey) {
+                alert("⚠️ Please paste your API Key first.");
+                return;
+            }
+
+            loadBtn.innerText = "Loading...";
+            loadBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/models`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider: provider, api_key: apiKey })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail);
+                }
+
+                const data = await response.json();
+                
+                // Clear and populate dropdown
+                modelDropdown.innerHTML = '';
+                if (data.models.length === 0) {
+                    modelDropdown.innerHTML = '<option value="">No models found.</option>';
+                } else {
+                    data.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.text = model;
+                        modelDropdown.appendChild(option);
+                    });
+                    
+                    // Enable the extraction button now that we have a model!
+                    modelDropdown.disabled = false;
+                    modelDropdown.classList.remove('bg-slate-100');
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            } catch (error) {
+                alert("❌ " + error.message);
+                modelDropdown.innerHTML = '<option value="">Connection Failed</option>';
+            } finally {
+                loadBtn.innerText = "Verify Key & Load Models";
+                loadBtn.disabled = false;
+            }
+        }
+
+        // Submitting Data
         async function submitTransaction() {
             const fileInput = document.getElementById('receipt-file');
             const textInput = document.getElementById('manual-entry').value;
             const submitText = document.getElementById('submit-text');
-            const submitBtn = submitText.parentElement;
+            const submitBtn = document.getElementById('submit-main-btn');
+            
+            const provider = document.getElementById('ai-provider').value;
+            const apiKey = document.getElementById('api-key-input').value;
+            const selectedModel = document.getElementById('ai-model').value;
 
             if (!fileInput.files[0] && !textInput.trim()) {
-                alert("⚠️ Please upload a bill or type some text first.");
+                alert("⚠️ Please upload a bill or type some text.");
                 return;
             }
 
-            const apiKey = prompt("🔐 To process this, please enter your Google Gemini API Key:");
-            if (!apiKey) return; 
+            if (!selectedModel) {
+                alert("⚠️ Please verify your key and select a model first.");
+                return;
+            }
 
             submitBtn.disabled = true;
-            submitBtn.classList.add("opacity-75", "cursor-not-allowed");
+            submitBtn.classList.add("opacity-50", "cursor-not-allowed");
             submitText.innerText = "🧠 AI is reading the bill...";
             
             const formData = new FormData();
             formData.append('mode', 'stock'); 
-            formData.append('provider', 'Google Gemini');
+            formData.append('provider', provider);
             formData.append('api_key', apiKey);
-            formData.append('model_name', 'gemini-1.5-flash'); 
+            formData.append('model_name', selectedModel); 
 
             if (fileInput.files[0]) {
                 formData.append('file', fileInput.files[0]);
@@ -222,19 +312,19 @@
 
                 alert("✅ Success! The items have been added to your inventory.");
                 closeModal();
-                fetchDashboardData(); // Refresh the screen automatically!
+                fetchDashboardData(); 
 
             } catch (error) {
                 alert("❌ Error: " + error.message);
                 console.error(error);
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.classList.remove("opacity-75", "cursor-not-allowed");
+                submitBtn.classList.remove("opacity-50", "cursor-not-allowed");
                 submitText.innerText = "Extract & Save Data";
             }
         }
 
-        // The Dashboard Display Logic
+        // Dashboard Display Logic
         async function fetchDashboardData() {
             try {
                 const metricsResponse = await fetch(`${API_BASE_URL}/api/metrics`);
