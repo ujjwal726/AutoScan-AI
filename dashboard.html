@@ -317,10 +317,27 @@
             transModal.classList.add('opacity-0');
             transContent.classList.remove('scale-100');
             transContent.classList.add('scale-95');
+            
             setTimeout(() => {
                 transModal.classList.add('hidden');
+                
+                // 1. Reset the form inputs
                 document.getElementById('transaction-form').reset();
                 globalExtractedData = null;
+                
+                // 2. Force reset the Extract Button
+                const extractBtn = document.getElementById('extract-btn');
+                extractBtn.disabled = false;
+                extractBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                document.getElementById('extract-text').innerText = "Extract Data with AI";
+                
+                // 3. Force reset the Save Button
+                const saveBtn = document.getElementById('save-btn');
+                saveBtn.disabled = false;
+                saveBtn.innerText = "Confirm & Save to Database";
+                
+                // 4. Send UI back to Step 1
+                backToForm(); 
             }, 300);
         }
 
@@ -377,7 +394,9 @@
 
             } catch (error) {
                 alert("❌ Error: " + error.message);
+                console.error(error);
             } finally {
+                // This guarantees the button turns back on, no matter what!
                 extractBtn.disabled = false;
                 extractBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 extractText.innerText = "Extract Data with AI";
