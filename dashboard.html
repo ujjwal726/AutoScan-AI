@@ -63,17 +63,17 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-8">
                 <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
                     <h2 class="text-lg font-semibold text-slate-800">Current Stock Levels</h2>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto max-h-64">
                     <table class="w-full text-left border-collapse">
                         <thead>
-                            <tr class="bg-slate-50 text-slate-500 text-sm uppercase tracking-wider">
+                            <tr class="bg-slate-50 text-slate-500 text-sm uppercase tracking-wider sticky top-0 shadow-sm">
                                 <th class="px-6 py-4 font-medium">Item Name</th>
                                 <th class="px-6 py-4 font-medium">Category</th>
-                                <th class="px-6 py-4 font-medium">In Stock</th>
+                                <th class="px-6 py-4 font-medium">Total In Stock</th>
                                 <th class="px-6 py-4 font-medium">Status</th>
                             </tr>
                         </thead>
@@ -83,6 +83,31 @@
                     </table>
                 </div>
             </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h2 class="text-lg font-semibold text-slate-800">Recent Transactions (Ledger)</h2>
+                </div>
+                <div class="overflow-x-auto max-h-96">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-white text-slate-500 uppercase tracking-wider sticky top-0 shadow-sm">
+                                <th class="px-6 py-4 font-medium">Date</th>
+                                <th class="px-6 py-4 font-medium">Item Name</th>
+                                <th class="px-6 py-4 font-medium">Category</th>
+                                <th class="px-6 py-4 font-medium">Qty</th>
+                                <th class="px-6 py-4 font-medium">Rate</th>
+                                <th class="px-6 py-4 font-medium">Total</th>
+                                <th class="px-6 py-4 font-medium">Mode</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-slate-700" id="ledger-table-body">
+                            <tr><td colspan="7" class="px-6 py-4 text-center text-slate-500">Loading ledger data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
 
         <div id="settings-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
@@ -96,7 +121,6 @@
                 </div>
                 <div class="p-6 space-y-4">
                     <p class="text-xs text-slate-500 mb-4">Set your AI preferences once. They will be saved securely in your browser.</p>
-                    
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">1. Choose AI Provider</label>
                         <select id="setting-provider" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
@@ -104,27 +128,17 @@
                             <option value="Groq">Groq (High Speed)</option>
                         </select>
                     </div>
-
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">2. Enter API Key</label>
                         <input type="password" id="setting-apikey" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Paste Key Here...">
                     </div>
-
-                    <button type="button" onclick="fetchModelsForSettings()" id="setting-fetch-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium py-2 rounded-md transition-colors">
-                        Verify Key & Fetch Models
-                    </button>
-
+                    <button type="button" onclick="fetchModelsForSettings()" id="setting-fetch-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium py-2 rounded-md transition-colors">Verify Key & Fetch Models</button>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">3. Select Active Model</label>
-                        <select id="setting-model" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-slate-50" disabled>
-                            <option value="">Awaiting API Key...</option>
-                        </select>
+                        <select id="setting-model" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-slate-50" disabled><option value="">Awaiting API Key...</option></select>
                     </div>
-
                     <div class="pt-4 border-t border-slate-100">
-                        <button type="button" onclick="saveGlobalSettings()" id="setting-save-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2.5 rounded-lg opacity-50 cursor-not-allowed" disabled>
-                            Save Configuration
-                        </button>
+                        <button type="button" onclick="saveGlobalSettings()" id="setting-save-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2.5 rounded-lg opacity-50 cursor-not-allowed" disabled>Save Configuration</button>
                     </div>
                 </div>
             </div>
@@ -141,12 +155,9 @@
                     <form id="transaction-form" class="space-y-4">
                         <label class="block text-sm font-medium text-slate-700 mb-2">Upload Bill/Receipt (Image or PDF)</label>
                         <input type="file" id="receipt-file" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 cursor-pointer" accept="image/*,.pdf">
-                        
                         <div class="text-center text-slate-400 text-xs font-medium py-1">OR</div>
-
                         <label class="block text-sm font-medium text-slate-700 mb-2">Manual Text Entry</label>
-                        <textarea id="manual-entry" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="e.g., Bought 50kg Sugar at 40/kg on 2023-10-25..."></textarea>
-
+                        <textarea id="manual-entry" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="e.g., Bought 50kg Sugar at 40/kg on 2026-03-25..."></textarea>
                         <button type="button" onclick="extractTransaction()" id="extract-btn" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-2.5 rounded-lg mt-4 shadow-sm">
                             <span id="extract-text">Extract Data with AI</span>
                         </button>
@@ -160,7 +171,6 @@
                             </h4>
                             <p class="text-xs text-emerald-600 mt-1">Review the parameters below before permanently saving to the database.</p>
                         </div>
-                        
                         <div class="overflow-y-auto max-h-60 border border-slate-200 rounded-lg shadow-inner">
                             <table class="w-full text-left text-xs">
                                 <thead class="bg-slate-100 sticky top-0">
@@ -176,12 +186,9 @@
                                     </tbody>
                             </table>
                         </div>
-
                         <div class="flex space-x-3 pt-2">
                             <button onclick="backToForm()" class="w-1/3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 rounded-lg transition-colors">Go Back</button>
-                            <button onclick="confirmAndSave()" id="save-btn" class="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg shadow-sm transition-all transform hover:-translate-y-0.5">
-                                Confirm & Save to Database
-                            </button>
+                            <button onclick="confirmAndSave()" id="save-btn" class="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg shadow-sm transition-all transform hover:-translate-y-0.5">Confirm & Save to Database</button>
                         </div>
                     </div>
                 </div>
@@ -216,22 +223,14 @@
         const settingsContent = document.getElementById('settings-content');
 
         function openSettingsModal() {
-            // Pre-fill existing settings if they exist
             document.getElementById('setting-provider').value = globalProvider;
             if(globalApiKey) document.getElementById('setting-apikey').value = globalApiKey;
-            
             settingsModal.classList.remove('hidden');
-            setTimeout(() => {
-                settingsModal.classList.remove('opacity-0');
-                settingsContent.classList.remove('scale-95');
-                settingsContent.classList.add('scale-100');
-            }, 10);
+            setTimeout(() => { settingsModal.classList.remove('opacity-0'); settingsContent.classList.remove('scale-95'); settingsContent.classList.add('scale-100'); }, 10);
         }
 
         function closeSettingsModal() {
-            settingsModal.classList.add('opacity-0');
-            settingsContent.classList.remove('scale-100');
-            settingsContent.classList.add('scale-95');
+            settingsModal.classList.add('opacity-0'); settingsContent.classList.remove('scale-100'); settingsContent.classList.add('scale-95');
             setTimeout(() => { settingsModal.classList.add('hidden'); }, 300);
         }
 
@@ -243,16 +242,13 @@
             const saveBtn = document.getElementById('setting-save-btn');
 
             if (!apiKey) { alert("⚠️ Please paste your API Key."); return; }
-
             fetchBtn.innerText = "Loading..."; fetchBtn.disabled = true;
 
             try {
                 const response = await fetch(`${API_BASE_URL}/api/models`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ provider: provider, api_key: apiKey })
                 });
-
                 if (!response.ok) throw new Error("Failed to load models. Check your API key.");
                 const data = await response.json();
                 
@@ -261,20 +257,12 @@
                     modelDropdown.innerHTML = '<option value="">No models found.</option>';
                 } else {
                     data.models.forEach(model => { modelDropdown.appendChild(new Option(model, model)); });
-                    
-                    // Select previously saved model if it exists in the new list
-                    if (globalModel && data.models.includes(globalModel)) {
-                        modelDropdown.value = globalModel;
-                    }
-
-                    modelDropdown.disabled = false;
-                    modelDropdown.classList.remove('bg-slate-50');
-                    saveBtn.disabled = false;
-                    saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    if (globalModel && data.models.includes(globalModel)) modelDropdown.value = globalModel;
+                    modelDropdown.disabled = false; modelDropdown.classList.remove('bg-slate-50');
+                    saveBtn.disabled = false; saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
             } catch (error) {
-                alert("❌ " + error.message);
-                modelDropdown.innerHTML = '<option value="">Connection Failed</option>';
+                alert("❌ " + error.message); modelDropdown.innerHTML = '<option value="">Connection Failed</option>';
             } finally {
                 fetchBtn.innerText = "Verify Key & Fetch Models"; fetchBtn.disabled = false;
             }
@@ -284,14 +272,8 @@
             globalProvider = document.getElementById('setting-provider').value;
             globalApiKey = document.getElementById('setting-apikey').value;
             globalModel = document.getElementById('setting-model').value;
-
-            localStorage.setItem('kirana_api_provider', globalProvider);
-            localStorage.setItem('kirana_api_key', globalApiKey);
-            localStorage.setItem('kirana_api_model', globalModel);
-
-            checkSystemReady();
-            closeSettingsModal();
-            alert("✅ AI Settings securely saved to your browser!");
+            localStorage.setItem('kirana_api_provider', globalProvider); localStorage.setItem('kirana_api_key', globalApiKey); localStorage.setItem('kirana_api_model', globalModel);
+            checkSystemReady(); closeSettingsModal(); alert("✅ AI Settings securely saved to your browser!");
         }
 
         // --- Transaction Modal Control ---
@@ -299,52 +281,27 @@
         const transContent = document.getElementById('transaction-content');
 
         function openTransactionModal() {
-            if (!globalApiKey || !globalModel) {
-                alert("⚠️ Please configure your AI Settings in the sidebar first.");
-                openSettingsModal();
-                return;
-            }
+            if (!globalApiKey || !globalModel) { alert("⚠️ Please configure your AI Settings in the sidebar first."); openSettingsModal(); return; }
             transModal.classList.remove('hidden');
-            setTimeout(() => {
-                transModal.classList.remove('opacity-0');
-                transContent.classList.remove('scale-95');
-                transContent.classList.add('scale-100');
-            }, 10);
+            setTimeout(() => { transModal.classList.remove('opacity-0'); transContent.classList.remove('scale-95'); transContent.classList.add('scale-100'); }, 10);
             backToForm(); 
         }
 
         function closeTransactionModal() {
-            transModal.classList.add('opacity-0');
-            transContent.classList.remove('scale-100');
-            transContent.classList.add('scale-95');
-            
-            setTimeout(() => {
-                transModal.classList.add('hidden');
-                
-                // 1. Reset the form inputs
-                document.getElementById('transaction-form').reset();
-                globalExtractedData = null;
-                
-                // 2. Force reset the Extract Button
+            transModal.classList.add('opacity-0'); transContent.classList.remove('scale-100'); transContent.classList.add('scale-95');
+            setTimeout(() => { 
+                transModal.classList.add('hidden'); document.getElementById('transaction-form').reset(); globalExtractedData = null; 
+                // Reset extraction buttons safely
                 const extractBtn = document.getElementById('extract-btn');
-                extractBtn.disabled = false;
-                extractBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                extractBtn.disabled = false; extractBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 document.getElementById('extract-text').innerText = "Extract Data with AI";
-                
-                // 3. Force reset the Save Button
                 const saveBtn = document.getElementById('save-btn');
-                saveBtn.disabled = false;
-                saveBtn.innerText = "Confirm & Save to Database";
-                
-                // 4. Send UI back to Step 1
-                backToForm(); 
+                saveBtn.disabled = false; saveBtn.innerText = "Confirm & Save to Database";
+                backToForm();
             }, 300);
         }
 
-        function backToForm() {
-            document.getElementById('preview-section').classList.add('hidden');
-            document.getElementById('transaction-form').classList.remove('hidden');
-        }
+        function backToForm() { document.getElementById('preview-section').classList.add('hidden'); document.getElementById('transaction-form').classList.remove('hidden'); }
 
         // --- Extract Data Logic ---
         async function extractTransaction() {
@@ -354,85 +311,46 @@
             const extractText = document.getElementById('extract-text');
 
             if (!fileInput.files[0] && !textInput.trim()) { alert("⚠️ Please provide a photo or text."); return; }
-
-            extractBtn.disabled = true;
-            extractBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            extractBtn.disabled = true; extractBtn.classList.add('opacity-50', 'cursor-not-allowed');
             extractText.innerText = `🧠 AI is reading using ${globalModel.substring(0,8)}...`;
             
             const formData = new FormData();
-            formData.append('mode', 'stock'); 
-            formData.append('provider', globalProvider); 
-            formData.append('api_key', globalApiKey);
-            formData.append('model_name', globalModel); 
-
-            if (fileInput.files[0]) formData.append('file', fileInput.files[0]);
-            else formData.append('text_data', textInput);
+            formData.append('mode', 'stock'); formData.append('provider', globalProvider); formData.append('api_key', globalApiKey); formData.append('model_name', globalModel); 
+            if (fileInput.files[0]) formData.append('file', fileInput.files[0]); else formData.append('text_data', textInput);
 
             try {
                 const response = await fetch(`${API_BASE_URL}/api/extract`, { method: 'POST', body: formData });
                 if (!response.ok) throw new Error("AI Extraction failed");
-
                 globalExtractedData = await response.json();
                 
-                // Populate the Preview Table
-                const tbody = document.getElementById('preview-table-body');
-                tbody.innerHTML = '';
+                const tbody = document.getElementById('preview-table-body'); tbody.innerHTML = '';
                 globalExtractedData.forEach(item => {
-                    tbody.insertAdjacentHTML('beforeend', `
-                        <tr class="hover:bg-slate-50">
-                            <td class="px-3 py-2 text-slate-500 whitespace-nowrap">${item.date || '-'}</td>
-                            <td class="px-3 py-2 font-medium text-slate-800">${item.item_name}</td>
-                            <td class="px-3 py-2">${item.quantity}</td>
-                            <td class="px-3 py-2">${item.unit_price}</td>
-                            <td class="px-3 py-2 font-semibold text-slate-700">${item.total}</td>
-                        </tr>
-                    `);
+                    tbody.insertAdjacentHTML('beforeend', `<tr class="hover:bg-slate-50"><td class="px-3 py-2 text-slate-500 whitespace-nowrap">${item.date || '-'}</td><td class="px-3 py-2 font-medium text-slate-800">${item.item_name}</td><td class="px-3 py-2">${item.quantity}</td><td class="px-3 py-2">${item.unit_price}</td><td class="px-3 py-2 font-semibold text-slate-700">${item.total}</td></tr>`);
                 });
-
-                document.getElementById('transaction-form').classList.add('hidden');
-                document.getElementById('preview-section').classList.remove('hidden');
-
+                document.getElementById('transaction-form').classList.add('hidden'); document.getElementById('preview-section').classList.remove('hidden');
             } catch (error) {
                 alert("❌ Error: " + error.message);
-                console.error(error);
             } finally {
-                // This guarantees the button turns back on, no matter what!
-                extractBtn.disabled = false;
-                extractBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                extractText.innerText = "Extract Data with AI";
+                extractBtn.disabled = false; extractBtn.classList.remove('opacity-50', 'cursor-not-allowed'); extractText.innerText = "Extract Data with AI";
             }
         }
 
         // --- Save to Database Logic ---
         async function confirmAndSave() {
-            const saveBtn = document.getElementById('save-btn');
-            saveBtn.disabled = true;
-            saveBtn.innerText = "💾 Saving...";
-
+            const saveBtn = document.getElementById('save-btn'); saveBtn.disabled = true; saveBtn.innerText = "💾 Saving...";
             try {
-                const response = await fetch(`${API_BASE_URL}/api/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mode: 'stock', items: globalExtractedData })
-                });
-
+                const response = await fetch(`${API_BASE_URL}/api/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'stock', items: globalExtractedData }) });
                 if (!response.ok) throw new Error("Database save failed");
-
                 alert("✅ Success! The data has been permanently saved.");
-                closeTransactionModal();
-                fetchDashboardData(); 
-
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.innerText = "Confirm & Save to Database";
-            }
+                closeTransactionModal(); fetchDashboardData(); 
+            } catch (error) { alert("❌ Error: " + error.message); } 
+            finally { saveBtn.disabled = false; saveBtn.innerText = "Confirm & Save to Database"; }
         }
 
-        // --- Dashboard Display Logic ---
+        // --- NEW: Master Fetch Logic (Metrics + Stock + Ledger) ---
         async function fetchDashboardData() {
             try {
+                // 1. Fetch Metrics
                 const metricsResponse = await fetch(`${API_BASE_URL}/api/metrics`);
                 const metrics = await metricsResponse.json();
                 const formatR = (num) => num.toLocaleString('en-IN');
@@ -442,17 +360,18 @@
                 document.getElementById('current-balance').innerText = `${metrics.balance >= 0 ? '+ ₹' : '- ₹'}${formatR(Math.abs(metrics.balance))}`;
                 document.getElementById('pending-udhari').innerText = `₹${formatR(metrics.udhari)}`;
 
+                // 2. Fetch Aggregated Stock
                 const stockResponse = await fetch(`${API_BASE_URL}/api/stock`);
                 const stockData = await stockResponse.json();
-                const tbody = document.getElementById('inventory-table-body');
-                tbody.innerHTML = ''; 
+                const stockBody = document.getElementById('inventory-table-body');
+                stockBody.innerHTML = ''; 
 
                 stockData.forEach(item => {
                     let badge = item.Status === 'Healthy' ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Healthy</span>` :
                                 item.Status === 'Reorder Soon' ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Reorder Soon</span>` :
                                 `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Low Stock</span>`;
                     
-                    tbody.insertAdjacentHTML('beforeend', `
+                    stockBody.insertAdjacentHTML('beforeend', `
                         <tr class="hover:bg-slate-50 transition-colors">
                             <td class="px-6 py-4 font-medium text-slate-900">${item.item_name}</td>
                             <td class="px-6 py-4 text-slate-500">${item.category}</td>
@@ -461,12 +380,36 @@
                         </tr>
                     `);
                 });
+
+                // 3. NEW: Fetch Raw Transactions (The Ledger!)
+                const ledgerResponse = await fetch(`${API_BASE_URL}/api/transactions`);
+                const ledgerData = await ledgerResponse.json();
+                const ledgerBody = document.getElementById('ledger-table-body');
+                ledgerBody.innerHTML = '';
+
+                if (ledgerData.length === 0) {
+                    ledgerBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-slate-500 italic">No recent transactions found. Add one above!</td></tr>`;
+                } else {
+                    ledgerData.forEach(tx => {
+                        const row = `
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="px-6 py-3 whitespace-nowrap text-slate-500">${tx.date}</td>
+                                <td class="px-6 py-3 font-medium text-slate-900">${tx.item_name}</td>
+                                <td class="px-6 py-3 text-slate-500">${tx.category}</td>
+                                <td class="px-6 py-3 font-semibold">${tx.quantity}</td>
+                                <td class="px-6 py-3 text-slate-600">₹${tx.unit_price}</td>
+                                <td class="px-6 py-3 font-bold text-slate-800">₹${tx.total}</td>
+                                <td class="px-6 py-3"><span class="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">${tx.payment_mode}</span></td>
+                            </tr>
+                        `;
+                        ledgerBody.insertAdjacentHTML('beforeend', row);
+                    });
+                }
             } catch (e) {
-                console.error(e);
+                console.error("Dashboard Fetch Error:", e);
             }
         }
 
-        // Run on startup
         document.addEventListener('DOMContentLoaded', () => {
             fetchDashboardData();
             checkSystemReady();
