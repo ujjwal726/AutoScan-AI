@@ -121,5 +121,65 @@
 
         </div>
     </main>
+    <script>
+        // 🚨 IMPORTANT: Replace this with your actual Render URL when it finishes building!
+        const API_BASE_URL = "https://YOUR-RENDER-APP-NAME.onrender.com"; 
+
+        async function fetchDashboardData() {
+            try {
+                // 1. Fetch and Update Financial Metrics
+                const metricsResponse = await fetch(`${API_BASE_URL}/api/metrics`);
+                const metrics = await metricsResponse.json();
+
+                // Format numbers to Indian Rupee style (e.g., 45,200)
+                const formatRupee = (num) => num.toLocaleString('en-IN');
+
+                document.getElementById('total-investment').innerText = `₹${formatRupee(metrics.investment)}`;
+                document.getElementById('total-revenue').innerText = `₹${formatRupee(metrics.revenue)}`;
+                
+                const balancePrefix = metrics.balance >= 0 ? '+ ₹' : '- ₹';
+                document.getElementById('current-balance').innerText = `${balancePrefix}${formatRupee(Math.abs(metrics.balance))}`;
+                document.getElementById('pending-udhari').innerText = `₹${formatRupee(metrics.udhari)}`;
+
+                // 2. Fetch and Update Inventory Table
+                const stockResponse = await fetch(`${API_BASE_URL}/api/stock`);
+                const stockData = await stockResponse.json();
+
+                const tbody = document.getElementById('inventory-table-body');
+                tbody.innerHTML = ''; // Clear out the hardcoded fake data
+
+                stockData.forEach(item => {
+                    let statusBadge = '';
+                    if(item.Status === 'Healthy') {
+                        statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Healthy</span>`;
+                    } else if(item.Status === 'Reorder Soon') {
+                        statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Reorder Soon</span>`;
+                    } else {
+                        statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Low Stock</span>`;
+                    }
+
+                    // Highlight low stock numbers in red
+                    const stockClass = item.Remaining_Stock <= 5 ? 'text-red-600' : '';
+
+                    const row = `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-medium text-slate-900">${item.item_name}</td>
+                            <td class="px-6 py-4 text-slate-500">${item.category}</td>
+                            <td class="px-6 py-4 font-semibold ${stockClass}">${item.Remaining_Stock} units</td>
+                            <td class="px-6 py-4">${statusBadge}</td>
+                        </tr>
+                    `;
+                    tbody.insertAdjacentHTML('beforeend', row);
+                });
+
+            } catch (error) {
+                console.error("Error fetching data from backend:", error);
+                document.getElementById('inventory-table-body').innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-red-500 font-medium">⚠️ Could not connect to the database server. Ensure Render is running.</td></tr>`;
+            }
+        }
+
+        // Trigger the fetch as soon as the webpage loads
+        document.addEventListener('DOMContentLoaded', fetchDashboardData);
+    </script>
 </body>
 </html>
