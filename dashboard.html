@@ -2,148 +2,188 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>KiranaAI Enterprise</title>
+    <title>KiranaAI Pro | Master Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <style> .tab-content { display: none; } .tab-content.active { display: block; } </style>
+    <style>
+        .tab-content, .modal { display: none; }
+        .tab-content.active, .modal.active { display: block; }
+    </style>
 </head>
 <body class="bg-slate-50 font-['Inter'] text-slate-800 flex h-screen overflow-hidden">
 
     <aside class="w-72 bg-slate-900 text-slate-400 flex flex-col p-6 shadow-2xl">
         <div class="mb-10 text-white"><h1 class="text-2xl font-black italic">🛒 Kirana<span class="text-indigo-400">AI</span></h1></div>
-        
         <nav class="space-y-1 flex-1">
-            <button onclick="switchTab('dash')" class="w-full flex items-center p-3 rounded-lg hover:bg-slate-800 hover:text-white transition">📊 Dashboard</button>
+            <button onclick="switchTab('dash')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 transition">📊 Dashboard</button>
             <div class="py-2 text-[10px] font-bold text-slate-600 uppercase px-3 mt-4">Data Entry</div>
-            <button onclick="openEntry('stock')" class="w-full flex items-center p-3 rounded-lg hover:bg-slate-800 hover:text-white transition text-sm">📥 Inventory In</button>
-            <button onclick="openEntry('sales')" class="w-full flex items-center p-3 rounded-lg hover:bg-slate-800 hover:text-white transition text-sm">📤 Sales Out</button>
-            <button onclick="switchTab('sup')" class="w-full flex items-center p-3 rounded-lg hover:bg-slate-800 hover:text-white transition text-sm">🏭 Supplier Data</button>
-            
+            <button onclick="openEntry('stock')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 transition text-sm">📥 Inventory Input</button>
+            <button onclick="openEntry('sales')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 transition text-sm">📤 Sales Input</button>
+            <button onclick="openEntry('suppliers')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 transition text-sm">📑 Supplier Rates</button>
             <div class="py-2 text-[10px] font-bold text-indigo-500 uppercase px-3 mt-4">AI Intelligence</div>
-            <button onclick="switchTab('forecast')" class="w-full flex items-center p-3 rounded-lg hover:bg-indigo-900/40 text-indigo-300 transition text-sm font-bold">🔮 Weekly Forecast</button>
-            <button onclick="switchTab('smart')" class="w-full flex items-center p-3 rounded-lg hover:bg-indigo-900/40 text-indigo-300 transition text-sm font-bold">🛒 Smart Order</button>
+            <button onclick="switchTab('forecast')" class="w-full text-left p-3 rounded-lg hover:bg-indigo-900/40 text-indigo-300 transition text-sm font-bold">🔮 Weekly Forecast</button>
+            <button onclick="switchTab('smart')" class="w-full text-left p-3 rounded-lg hover:bg-indigo-900/40 text-indigo-300 transition text-sm font-bold">🛒 Smart Order</button>
         </nav>
-
         <div class="pt-6 border-t border-slate-800 space-y-2">
-            <button onclick="openSettings()" class="w-full p-2 text-xs bg-slate-800 rounded hover:bg-slate-700 transition">⚙️ AI Config</button>
-            <button onclick="runSimulation()" class="w-full p-2 text-xs bg-indigo-900/30 text-indigo-400 rounded hover:bg-indigo-900/50 transition">🧪 Simulation</button>
-            <button onclick="resetAll()" class="w-full p-2 text-xs bg-red-900/10 text-red-500 rounded hover:bg-red-900/20 transition">🗑️ Reset Data</button>
+            <button onclick="openModal('settings')" class="w-full p-2 text-xs bg-slate-800 rounded">⚙️ AI Config</button>
+            <button onclick="runSimulation()" class="w-full p-2 text-xs bg-indigo-900/30 text-indigo-400 rounded">🧪 Simulation</button>
+            <button onclick="resetSystem()" class="w-full p-2 text-xs bg-red-900/10 text-red-500 rounded">🗑️ Reset System</button>
         </div>
     </aside>
 
     <main class="flex-1 flex flex-col overflow-hidden bg-white">
-        <header class="h-16 border-b flex items-center justify-between px-8 bg-white/80 backdrop-blur-md">
+        <header class="h-16 border-b flex items-center justify-between px-8 bg-white/80">
             <h2 id="header-title" class="text-xl font-extrabold text-slate-900">Dashboard</h2>
-            <div class="flex items-center space-x-2 text-[10px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 uppercase">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>System Online</span>
+            <div class="flex items-center space-x-2 text-[10px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 uppercase animate-pulse">
+                <span>System Live</span>
             </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-8">
             <div id="tab-dash" class="tab-content active">
-                <div class="grid grid-cols-4 gap-6 mb-10">
-                    <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                        <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Investment</p>
-                        <h3 id="stat-inv" class="text-3xl font-black">₹0</h3>
-                    </div>
-                    <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                        <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Revenue</p>
-                        <h3 id="stat-rev" class="text-3xl font-black">₹0</h3>
-                    </div>
-                    <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                        <p class="text-emerald-400 text-[10px] font-bold uppercase mb-1">Balance</p>
-                        <h3 id="stat-bal" class="text-3xl font-black text-emerald-600">₹0</h3>
-                    </div>
-                    <div class="bg-red-50 p-6 rounded-3xl border border-red-100">
-                        <p class="text-red-400 text-[10px] font-bold uppercase mb-1">Udhari</p>
-                        <h3 id="stat-udh" class="text-3xl font-black text-red-600">₹0</h3>
-                    </div>
-                </div>
+                <div class="grid grid-cols-4 gap-6 mb-10" id="metrics-grid"></div>
                 <div class="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
-                    <div class="p-6 border-b font-bold bg-slate-50/50">Current Stock Inventory</div>
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-50/50 text-slate-400 uppercase text-[10px] font-bold"><tr><th class="p-4">Item Name</th><th class="p-4 text-right">Quantity In Stock</th></tr></thead>
-                        <tbody id="stock-table" class="divide-y divide-slate-50"></tbody>
-                    </table>
+                    <table class="w-full text-left"><thead class="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase"><tr><th class="p-4">Item</th><th class="p-4 text-right">In Stock</th></tr></thead><tbody id="stock-table"></tbody></table>
                 </div>
             </div>
-
-            <div id="tab-forecast" class="tab-content">
-                <h3 class="text-3xl font-black mb-8">Weekly Demand Forecast</h3>
-                <div id="forecast-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-            </div>
-
-            <div id="tab-smart" class="tab-content">
-                <h3 class="text-3xl font-black mb-2">Smart Procurement</h3>
-                <p class="text-slate-400 text-sm mb-10">Optimizing orders based on forecast and lowest landed cost (Price + Transport).</p>
-                <div id="order-list" class="space-y-4"></div>
-            </div>
+            <div id="tab-forecast" class="tab-content"><div id="forecast-grid" class="grid grid-cols-3 gap-6"></div></div>
+            <div id="tab-smart" class="tab-content"><div id="order-list" class="space-y-4"></div></div>
         </div>
     </main>
 
+    <div id="modal-entry" class="modal fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50">
+        <div class="bg-white w-[500px] mx-auto mt-20 rounded-3xl p-8 shadow-2xl">
+            <h3 id="entry-title" class="text-2xl font-bold mb-6">Data Entry</h3>
+            
+            <div id="entry-step-1" class="space-y-4">
+                <select id="input-type" class="w-full border p-3 rounded-xl bg-slate-50 text-sm">
+                    <option value="manual">Manual Text Entry</option>
+                    <option value="file">Image/PDF Upload (AI OCR)</option>
+                    <option value="csv">CSV/Excel File Upload</option>
+                </select>
+                <div id="supplier-extras" class="hidden space-y-2">
+                    <input id="sup-name" placeholder="Supplier Name" class="w-full border p-3 rounded-xl text-sm">
+                    <input id="sup-dist" type="number" placeholder="Distance (km)" class="w-full border p-3 rounded-xl text-sm">
+                </div>
+                <textarea id="entry-text" class="w-full border p-4 rounded-xl h-32 text-sm" placeholder="Paste data here..."></textarea>
+                <input type="file" id="entry-file" class="hidden">
+                <button onclick="processEntry()" id="btn-process" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">🔍 Extract with AI</button>
+            </div>
+
+            <div id="entry-step-2" class="hidden space-y-4">
+                <div class="bg-emerald-50 p-4 rounded-xl text-xs font-mono max-h-40 overflow-auto" id="entry-preview"></div>
+                <button onclick="saveEntry()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">💾 Confirm & Save to Cloud</button>
+                <button onclick="closeModals()" class="w-full text-slate-400 text-sm">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="modal fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50">
+        <div class="bg-white w-[400px] mx-auto mt-20 rounded-3xl p-8 shadow-2xl space-y-4">
+            <h3 class="text-xl font-bold">AI Configuration</h3>
+            <select id="ai-provider" class="w-full border p-3 rounded-xl text-sm" onchange="fetchModels()">
+                <option value="Google Gemini">Google Gemini</option>
+                <option value="Groq">Groq</option>
+            </select>
+            <input id="ai-key" type="password" placeholder="API Key" class="w-full border p-3 rounded-xl text-sm">
+            <button onclick="fetchModels()" class="w-full bg-slate-800 text-white py-2 rounded-xl text-xs">Discover Models</button>
+            <select id="ai-model" class="w-full border p-3 rounded-xl text-sm"></select>
+            <button onclick="saveSettings()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Save Settings</button>
+        </div>
+    </div>
+
     <script>
         const API_BASE_URL = "https://autoscan-ai-psz1.onrender.com";
-        
-        async function refreshData() {
+        let currentMode = '';
+        let extractedData = null;
+
+        // --- DASHBOARD REFRESH ---
+        async function refresh() {
             const res = await fetch(`${API_BASE_URL}/api/dashboard`);
             const data = await res.json();
-            const fmt = (v) => v.toLocaleString('en-IN');
-            document.getElementById('stat-inv').innerText = `₹${fmt(data.metrics.investment)}`;
-            document.getElementById('stat-rev').innerText = `₹${fmt(data.metrics.revenue)}`;
-            document.getElementById('stat-bal').innerText = `₹${fmt(data.metrics.balance)}`;
-            document.getElementById('stat-udh').innerText = `₹${fmt(data.metrics.udhari)}`;
+            const fmt = (v) => `₹${v.toLocaleString('en-IN')}`;
             
+            document.getElementById('metrics-grid').innerHTML = `
+                <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100"><p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Investment</p><h3 class="text-3xl font-black">${fmt(data.metrics.investment)}</h3></div>
+                <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100"><p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Revenue</p><h3 class="text-3xl font-black">${fmt(data.metrics.revenue)}</h3></div>
+                <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100"><p class="text-emerald-400 text-[10px] font-bold uppercase mb-1">Balance</p><h3 class="text-3xl font-black text-emerald-600">${fmt(data.metrics.balance)}</h3></div>
+                <div class="bg-red-50 p-6 rounded-3xl border border-red-100"><p class="text-red-400 text-[10px] font-bold uppercase mb-1">Udhari</p><h3 class="text-3xl font-black text-red-600">${fmt(data.metrics.udhari)}</h3></div>
+            `;
+
             document.getElementById('stock-table').innerHTML = Object.entries(data.stock).map(([item, qty]) => `
                 <tr><td class="p-4 font-semibold">${item}</td><td class="p-4 text-right font-mono">${qty} units</td></tr>
             `).join('');
         }
 
-        async function switchTab(id) {
+        // --- TABS ---
+        function switchTab(id) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.getElementById('tab-' + id).classList.add('active');
             if(id === 'forecast') loadForecast();
             if(id === 'smart') loadSmartOrders();
         }
 
-        async function loadForecast() {
-            const res = await fetch(`${API_BASE_URL}/api/forecast`);
+        // --- DATA ENTRY FLOW ---
+        function openEntry(mode) {
+            currentMode = mode;
+            document.getElementById('entry-title').innerText = `Add ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+            document.getElementById('supplier-extras').style.display = (mode === 'suppliers') ? 'block' : 'none';
+            document.getElementById('entry-step-1').classList.remove('hidden');
+            document.getElementById('entry-step-2').classList.add('hidden');
+            document.getElementById('modal-entry').classList.add('active');
+        }
+
+        async function processEntry() {
+            const btn = document.getElementById('btn-process');
+            btn.innerText = "🧠 AI is Thinking..."; btn.disabled = true;
+            
+            const formData = new FormData();
+            formData.append('mode', currentMode);
+            formData.append('provider', localStorage.getItem('ki_provider'));
+            formData.append('api_key', localStorage.getItem('ki_key'));
+            formData.append('model_name', localStorage.getItem('ki_model'));
+            formData.append('text_data', document.getElementById('entry-text').value);
+
+            const res = await fetch(`${API_BASE_URL}/api/extract`, { method: 'POST', body: formData });
+            extractedData = await res.json();
+            
+            document.getElementById('entry-preview').innerText = JSON.stringify(extractedData, null, 2);
+            document.getElementById('entry-step-1').classList.add('hidden');
+            document.getElementById('entry-step-2').classList.remove('hidden');
+            btn.innerText = "Extract with AI"; btn.disabled = false;
+        }
+
+        async function saveEntry() {
+            const payload = {
+                mode: currentMode,
+                items: extractedData,
+                supplier_name: document.getElementById('sup-name').value,
+                distance_km: document.getElementById('sup-dist').value
+            };
+            await fetch(`${API_BASE_URL}/api/save`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+            closeModals(); refresh(); alert("✅ Saved to Cloud!");
+        }
+
+        // --- UTILS ---
+        function openModal(id) { document.getElementById('modal-' + id).classList.add('active'); }
+        function closeModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
+        
+        async function fetchModels() {
+            const prov = document.getElementById('ai-provider').value;
+            const key = document.getElementById('ai-key').value;
+            const res = await fetch(`${API_BASE_URL}/api/models`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({provider: prov, api_key: key})});
             const data = await res.json();
-            document.getElementById('forecast-grid').innerHTML = data.map(f => `
-                <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-                    <p class="text-lg font-bold">${f.item_name}</p>
-                    <div class="mt-4 flex justify-between text-xs"><span class="text-slate-400">Predicted Demand</span><span class="font-bold">${f.demand_7d}</span></div>
-                    <div class="mt-4 text-center"><p class="text-[10px] text-slate-400 uppercase">Suggested Order</p><p class="text-3xl font-black ${f.suggested_order > 0 ? 'text-indigo-600' : 'text-slate-200'}">${f.suggested_order}</p></div>
-                </div>
-            `).join('');
+            document.getElementById('ai-model').innerHTML = data.models.map(m => `<option value="${m}">${m}</option>`).join('');
         }
 
-        async function loadSmartOrders() {
-            const res = await fetch(`${API_BASE_URL}/api/smart-order`);
-            const data = await res.json();
-            const list = document.getElementById('order-list');
-            if(data.length === 0) { list.innerHTML = `<div class="p-10 text-center text-slate-400">No pending orders. Stock is healthy!</div>`; return; }
-            list.innerHTML = data.map(o => `
-                <div class="bg-white p-6 rounded-3xl border border-slate-100 flex items-center justify-between">
-                    <div><p class="font-bold text-lg">${o.qty}x ${o.item}</p><p class="text-xs text-slate-400">Supplier: ${o.supplier} | Rate: ₹${o.price}</p></div>
-                    <button onclick="window.open('https://wa.me/${o.contact}?text=Order:%20${o.qty}%20${o.item}')" class="bg-emerald-500 text-white px-6 py-2 rounded-full font-bold text-xs hover:bg-emerald-600 transition">Order via WA</button>
-                </div>
-            `).join('');
+        function saveSettings() {
+            localStorage.setItem('ki_provider', document.getElementById('ai-provider').value);
+            localStorage.setItem('ki_key', document.getElementById('ai-key').value);
+            localStorage.setItem('ki_model', document.getElementById('ai-model').value);
+            closeModals();
         }
 
-        async function runSimulation() {
-            if(!confirm("Inject 30 days of sample data?")) return;
-            await fetch(`${API_BASE_URL}/api/simulate`, {method: 'POST'});
-            alert("Simulation complete! Data is now in your cloud database.");
-            refreshData();
-        }
-
-        async function resetAll() {
-            if(!confirm("DELETE ALL CLOUD DATA?")) return;
-            await fetch(`${API_BASE_URL}/api/reset`, {method: 'POST'});
-            refreshData();
-        }
-
-        document.addEventListener('DOMContentLoaded', () => { refreshData(); });
+        document.addEventListener('DOMContentLoaded', refresh);
     </script>
 </body>
 </html>
