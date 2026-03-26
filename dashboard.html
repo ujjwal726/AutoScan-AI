@@ -2,442 +2,148 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kirana AI | Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>KiranaAI Enterprise</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] }, colors: { brand: { 500: '#4F46E5', 600: '#4338CA' } } } }
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style> .tab-content { display: none; } .tab-content.active { display: block; } </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans flex h-screen overflow-hidden">
+<body class="bg-slate-50 font-['Inter'] text-slate-800 flex h-screen overflow-hidden">
 
-    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col transition-all duration-300 z-10">
-        <div class="h-16 flex items-center px-6 border-b border-slate-800 font-bold text-xl text-white tracking-wide">
-            🛒 Kirana<span class="text-brand-500">AI</span>
-        </div>
-        <nav class="flex-1 py-4 space-y-1 px-3 flex flex-col">
-            <a href="#" class="flex items-center px-3 py-2.5 bg-brand-500 text-white rounded-lg shadow-sm mb-2">
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                Dashboard
-            </a>
+    <aside class="w-72 bg-slate-900 text-slate-400 flex flex-col p-6 shadow-2xl">
+        <div class="mb-10 text-white"><h1 class="text-2xl font-black italic">🛒 Kirana<span class="text-indigo-400">AI</span></h1></div>
+        
+        <nav class="space-y-1 flex-1">
+            <button onclick="switchTab('dash')" class="w-full flex items-center p-3 rounded-lg hover:bg-slate-800 hover:text-white transition">📊 Dashboard</button>
+            <div class="py-2 text-[10px] font-bold text-slate-600 uppercase px-3 mt-4">Data Entry</div>
+            <button onclick="openEntry('stock')" class="w-full flex items-center p-3 rounded-lg hover:bg-slate-800 hover:text-white transition text-sm">📥 Inventory In</button>
+            <button onclick="openEntry('sales')" class="w-full flex items-center p-3 rounded-lg hover:bg-slate-800 hover:text-white transition text-sm">📤 Sales Out</button>
+            <button onclick="switchTab('sup')" class="w-full flex items-center p-3 rounded-lg hover:bg-slate-800 hover:text-white transition text-sm">🏭 Supplier Data</button>
             
-            <div class="mt-auto pt-4 border-t border-slate-800">
-                <button onclick="openSettingsModal()" class="w-full flex items-center px-3 py-2.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors group">
-                    <svg class="w-5 h-5 mr-3 group-hover:text-brand-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    <span id="sidebar-key-status" class="font-medium text-sm">AI Settings</span>
-                </button>
-            </div>
+            <div class="py-2 text-[10px] font-bold text-indigo-500 uppercase px-3 mt-4">AI Intelligence</div>
+            <button onclick="switchTab('forecast')" class="w-full flex items-center p-3 rounded-lg hover:bg-indigo-900/40 text-indigo-300 transition text-sm font-bold">🔮 Weekly Forecast</button>
+            <button onclick="switchTab('smart')" class="w-full flex items-center p-3 rounded-lg hover:bg-indigo-900/40 text-indigo-300 transition text-sm font-bold">🛒 Smart Order</button>
         </nav>
+
+        <div class="pt-6 border-t border-slate-800 space-y-2">
+            <button onclick="openSettings()" class="w-full p-2 text-xs bg-slate-800 rounded hover:bg-slate-700 transition">⚙️ AI Config</button>
+            <button onclick="runSimulation()" class="w-full p-2 text-xs bg-indigo-900/30 text-indigo-400 rounded hover:bg-indigo-900/50 transition">🧪 Simulation</button>
+            <button onclick="resetAll()" class="w-full p-2 text-xs bg-red-900/10 text-red-500 rounded hover:bg-red-900/20 transition">🗑️ Reset Data</button>
+        </div>
     </aside>
 
-    <main class="flex-1 flex flex-col overflow-hidden">
-        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
-            <h1 class="text-2xl font-semibold text-slate-800">Inventory Overview</h1>
-            <div class="flex items-center space-x-4">
-                <button onclick="openTransactionModal()" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-all transform hover:-translate-y-0.5">
-                    + Add Transaction
-                </button>
+    <main class="flex-1 flex flex-col overflow-hidden bg-white">
+        <header class="h-16 border-b flex items-center justify-between px-8 bg-white/80 backdrop-blur-md">
+            <h2 id="header-title" class="text-xl font-extrabold text-slate-900">Dashboard</h2>
+            <div class="flex items-center space-x-2 text-[10px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 uppercase">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>System Online</span>
             </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
-                    <span class="text-slate-500 text-sm font-medium mb-1">Total Investment</span>
-                    <span class="text-3xl font-bold text-slate-800" id="total-investment">Loading...</span>
+            <div id="tab-dash" class="tab-content active">
+                <div class="grid grid-cols-4 gap-6 mb-10">
+                    <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                        <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Investment</p>
+                        <h3 id="stat-inv" class="text-3xl font-black">₹0</h3>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                        <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Revenue</p>
+                        <h3 id="stat-rev" class="text-3xl font-black">₹0</h3>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                        <p class="text-emerald-400 text-[10px] font-bold uppercase mb-1">Balance</p>
+                        <h3 id="stat-bal" class="text-3xl font-black text-emerald-600">₹0</h3>
+                    </div>
+                    <div class="bg-red-50 p-6 rounded-3xl border border-red-100">
+                        <p class="text-red-400 text-[10px] font-bold uppercase mb-1">Udhari</p>
+                        <h3 id="stat-udh" class="text-3xl font-black text-red-600">₹0</h3>
+                    </div>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
-                    <span class="text-slate-500 text-sm font-medium mb-1">Total Revenue</span>
-                    <span class="text-3xl font-bold text-slate-800" id="total-revenue">Loading...</span>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
-                    <span class="text-slate-500 text-sm font-medium mb-1">Current Balance</span>
-                    <span class="text-3xl font-bold text-emerald-600" id="current-balance">Loading...</span>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border-t-4 border-t-red-500 border-x border-b border-slate-100 p-6 flex flex-col relative">
-                    <span class="text-slate-500 text-sm font-medium mb-1">Pending Udhari</span>
-                    <span class="text-3xl font-bold text-red-600" id="pending-udhari">Loading...</span>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-8">
-                <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
-                    <h2 class="text-lg font-semibold text-slate-800">Current Stock Levels</h2>
-                </div>
-                <div class="overflow-x-auto max-h-64">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-slate-50 text-slate-500 text-sm uppercase tracking-wider sticky top-0 shadow-sm">
-                                <th class="px-6 py-4 font-medium">Item Name</th>
-                                <th class="px-6 py-4 font-medium">Category</th>
-                                <th class="px-6 py-4 font-medium">Total In Stock</th>
-                                <th class="px-6 py-4 font-medium">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 text-slate-700" id="inventory-table-body">
-                            <tr><td colspan="4" class="px-6 py-4 text-center text-slate-500" id="stock-loading">Loading stock data...</td></tr>
-                        </tbody>
+                <div class="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
+                    <div class="p-6 border-b font-bold bg-slate-50/50">Current Stock Inventory</div>
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50/50 text-slate-400 uppercase text-[10px] font-bold"><tr><th class="p-4">Item Name</th><th class="p-4 text-right">Quantity In Stock</th></tr></thead>
+                        <tbody id="stock-table" class="divide-y divide-slate-50"></tbody>
                     </table>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h2 class="text-lg font-semibold text-slate-800">Recent Transactions (Ledger)</h2>
-                </div>
-                <div class="overflow-x-auto max-h-96">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-white text-slate-500 uppercase tracking-wider sticky top-0 shadow-sm">
-                                <th class="px-6 py-4 font-medium">Date</th>
-                                <th class="px-6 py-4 font-medium">Item Name</th>
-                                <th class="px-6 py-4 font-medium">Category</th>
-                                <th class="px-6 py-4 font-medium">Qty</th>
-                                <th class="px-6 py-4 font-medium">Rate</th>
-                                <th class="px-6 py-4 font-medium">Total</th>
-                                <th class="px-6 py-4 font-medium">Mode</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 text-slate-700" id="ledger-table-body">
-                            <tr><td colspan="7" class="px-6 py-4 text-center text-slate-500" id="ledger-loading">Loading ledger data...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div id="tab-forecast" class="tab-content">
+                <h3 class="text-3xl font-black mb-8">Weekly Demand Forecast</h3>
+                <div id="forecast-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </div>
 
-        </div>
-
-        <div id="settings-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform scale-95 transition-all duration-300" id="settings-content">
-                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 class="text-lg font-semibold text-slate-800 flex items-center">
-                        <svg class="w-5 h-5 mr-2 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        Global AI Configuration
-                    </h3>
-                    <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-                </div>
-                <div class="p-6 space-y-4">
-                    <p class="text-xs text-slate-500 mb-4">Set your AI preferences once. They will be saved securely in your browser.</p>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">1. Choose AI Provider</label>
-                        <select id="setting-provider" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-                            <option value="Google Gemini">Google Gemini</option>
-                            <option value="Groq">Groq (High Speed)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">2. Enter API Key</label>
-                        <input type="password" id="setting-apikey" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Paste Key Here...">
-                    </div>
-                    <button type="button" onclick="fetchModelsForSettings()" id="setting-fetch-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium py-2 rounded-md transition-colors">Verify Key & Fetch Models</button>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">3. Select Active Model</label>
-                        <select id="setting-model" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-slate-50" disabled><option value="">Awaiting API Key...</option></select>
-                    </div>
-                    <div class="pt-4 border-t border-slate-100">
-                        <button type="button" onclick="saveGlobalSettings()" id="setting-save-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2.5 rounded-lg opacity-50 cursor-not-allowed" disabled>Save Configuration</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="transaction-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform scale-95 transition-all duration-300" id="transaction-content">
-                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 class="text-lg font-semibold text-slate-800">Add New Transaction</h3>
-                    <button onclick="closeTransactionModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-                </div>
-                
-                <div class="p-6">
-                    <form id="transaction-form" class="space-y-4">
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Upload Bill/Receipt (Image or PDF)</label>
-                        <input type="file" id="receipt-file" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 cursor-pointer" accept="image/*,.pdf">
-                        <div class="text-center text-slate-400 text-xs font-medium py-1">OR</div>
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Manual Text Entry</label>
-                        <textarea id="manual-entry" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="e.g., Bought 50kg Sugar at 40/kg on 2026-03-25..."></textarea>
-                        <button type="button" onclick="extractTransaction()" id="extract-btn" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-2.5 rounded-lg mt-4 shadow-sm">
-                            <span id="extract-text">Extract Data with AI</span>
-                        </button>
-                    </form>
-
-                    <div id="preview-section" class="hidden space-y-4">
-                        <div class="bg-emerald-50 border border-emerald-200 rounded-md p-3">
-                            <h4 class="text-sm font-semibold text-emerald-800 flex items-center">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                                AI Extraction Successful
-                            </h4>
-                            <p class="text-xs text-emerald-600 mt-1">Review the parameters below before permanently saving to the database.</p>
-                        </div>
-                        <div class="overflow-y-auto max-h-60 border border-slate-200 rounded-lg shadow-inner">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-slate-100 sticky top-0">
-                                    <tr>
-                                        <th class="px-3 py-2 font-semibold text-slate-600 border-b">Date</th>
-                                        <th class="px-3 py-2 font-semibold text-slate-600 border-b">Item</th>
-                                        <th class="px-3 py-2 font-semibold text-slate-600 border-b">Qty</th>
-                                        <th class="px-3 py-2 font-semibold text-slate-600 border-b">Rate (₹)</th>
-                                        <th class="px-3 py-2 font-semibold text-slate-600 border-b">Total (₹)</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="preview-table-body" class="divide-y divide-slate-100 bg-white">
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="flex space-x-3 pt-2">
-                            <button onclick="backToForm()" class="w-1/3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 rounded-lg transition-colors">Go Back</button>
-                            <button onclick="confirmAndSave()" id="save-btn" class="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg shadow-sm transition-all transform hover:-translate-y-0.5">Confirm & Save to Database</button>
-                        </div>
-                    </div>
-                </div>
+            <div id="tab-smart" class="tab-content">
+                <h3 class="text-3xl font-black mb-2">Smart Procurement</h3>
+                <p class="text-slate-400 text-sm mb-10">Optimizing orders based on forecast and lowest landed cost (Price + Transport).</p>
+                <div id="order-list" class="space-y-4"></div>
             </div>
         </div>
     </main>
 
     <script>
-        const API_BASE_URL = "https://autoscan-ai-psz1.onrender.com"; 
+        const API_BASE_URL = "https://autoscan-ai-psz1.onrender.com";
         
-        let globalProvider = localStorage.getItem('kirana_api_provider') || 'Google Gemini';
-        let globalApiKey = localStorage.getItem('kirana_api_key');
-        let globalModel = localStorage.getItem('kirana_api_model');
-        let globalExtractedData = null; 
-
-        function checkSystemReady() {
-            const statusText = document.getElementById('sidebar-key-status');
-            if (globalApiKey && globalModel) {
-                statusText.innerText = "AI Ready (" + globalModel.substring(0,8) + "...)";
-                statusText.classList.replace('text-slate-400', 'text-emerald-400');
-                statusText.parentElement.classList.replace('text-slate-400', 'text-emerald-400');
-            } else {
-                statusText.innerText = "⚠️ Setup AI Settings";
-                statusText.classList.replace('text-emerald-400', 'text-amber-400');
-                statusText.parentElement.classList.replace('text-emerald-400', 'text-amber-400');
-            }
-        }
-
-        const settingsModal = document.getElementById('settings-modal');
-        const settingsContent = document.getElementById('settings-content');
-
-        function openSettingsModal() {
-            document.getElementById('setting-provider').value = globalProvider;
-            if(globalApiKey) document.getElementById('setting-apikey').value = globalApiKey;
-            settingsModal.classList.remove('hidden');
-            setTimeout(() => { settingsModal.classList.remove('opacity-0'); settingsContent.classList.remove('scale-95'); settingsContent.classList.add('scale-100'); }, 10);
-        }
-
-        function closeSettingsModal() {
-            settingsModal.classList.add('opacity-0'); settingsContent.classList.remove('scale-100'); settingsContent.classList.add('scale-95');
-            setTimeout(() => { settingsModal.classList.add('hidden'); }, 300);
-        }
-
-        async function fetchModelsForSettings() {
-            const provider = document.getElementById('setting-provider').value;
-            const apiKey = document.getElementById('setting-apikey').value;
-            const fetchBtn = document.getElementById('setting-fetch-btn');
-            const modelDropdown = document.getElementById('setting-model');
-            const saveBtn = document.getElementById('setting-save-btn');
-
-            if (!apiKey) { alert("⚠️ Please paste your API Key."); return; }
-            fetchBtn.innerText = "Loading..."; fetchBtn.disabled = true;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/models`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ provider: provider, api_key: apiKey })
-                });
-                if (!response.ok) throw new Error("Failed to load models. Check your API key.");
-                const data = await response.json();
-                
-                modelDropdown.innerHTML = '';
-                if (data.models.length === 0) {
-                    modelDropdown.innerHTML = '<option value="">No models found.</option>';
-                } else {
-                    data.models.forEach(model => { modelDropdown.appendChild(new Option(model, model)); });
-                    if (globalModel && data.models.includes(globalModel)) modelDropdown.value = globalModel;
-                    modelDropdown.disabled = false; modelDropdown.classList.remove('bg-slate-50');
-                    saveBtn.disabled = false; saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                }
-            } catch (error) {
-                alert("❌ " + error.message); modelDropdown.innerHTML = '<option value="">Connection Failed</option>';
-            } finally {
-                fetchBtn.innerText = "Verify Key & Fetch Models"; fetchBtn.disabled = false;
-            }
-        }
-
-        function saveGlobalSettings() {
-            globalProvider = document.getElementById('setting-provider').value;
-            globalApiKey = document.getElementById('setting-apikey').value;
-            globalModel = document.getElementById('setting-model').value;
-            localStorage.setItem('kirana_api_provider', globalProvider); localStorage.setItem('kirana_api_key', globalApiKey); localStorage.setItem('kirana_api_model', globalModel);
-            checkSystemReady(); closeSettingsModal(); alert("✅ AI Settings securely saved to your browser!");
-        }
-
-        const transModal = document.getElementById('transaction-modal');
-        const transContent = document.getElementById('transaction-content');
-
-        function openTransactionModal() {
-            if (!globalApiKey || !globalModel) { alert("⚠️ Please configure your AI Settings in the sidebar first."); openSettingsModal(); return; }
-            transModal.classList.remove('hidden');
-            setTimeout(() => { transModal.classList.remove('opacity-0'); transContent.classList.remove('scale-95'); transContent.classList.add('scale-100'); }, 10);
-            backToForm(); 
-        }
-
-        function closeTransactionModal() {
-            transModal.classList.add('opacity-0'); transContent.classList.remove('scale-100'); transContent.classList.add('scale-95');
-            setTimeout(() => { 
-                transModal.classList.add('hidden'); document.getElementById('transaction-form').reset(); globalExtractedData = null; 
-                const extractBtn = document.getElementById('extract-btn');
-                extractBtn.disabled = false; extractBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                document.getElementById('extract-text').innerText = "Extract Data with AI";
-                const saveBtn = document.getElementById('save-btn');
-                saveBtn.disabled = false; saveBtn.innerText = "Confirm & Save to Database";
-                backToForm();
-            }, 300);
-        }
-
-        function backToForm() { document.getElementById('preview-section').classList.add('hidden'); document.getElementById('transaction-form').classList.remove('hidden'); }
-
-        async function extractTransaction() {
-            const fileInput = document.getElementById('receipt-file');
-            const textInput = document.getElementById('manual-entry').value;
-            const extractBtn = document.getElementById('extract-btn');
-            const extractText = document.getElementById('extract-text');
-
-            if (!fileInput.files[0] && !textInput.trim()) { alert("⚠️ Please provide a photo or text."); return; }
-            extractBtn.disabled = true; extractBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            extractText.innerText = `🧠 AI is reading using ${globalModel.substring(0,8)}...`;
+        async function refreshData() {
+            const res = await fetch(`${API_BASE_URL}/api/dashboard`);
+            const data = await res.json();
+            const fmt = (v) => v.toLocaleString('en-IN');
+            document.getElementById('stat-inv').innerText = `₹${fmt(data.metrics.investment)}`;
+            document.getElementById('stat-rev').innerText = `₹${fmt(data.metrics.revenue)}`;
+            document.getElementById('stat-bal').innerText = `₹${fmt(data.metrics.balance)}`;
+            document.getElementById('stat-udh').innerText = `₹${fmt(data.metrics.udhari)}`;
             
-            const formData = new FormData();
-            formData.append('mode', 'stock'); formData.append('provider', globalProvider); formData.append('api_key', globalApiKey); formData.append('model_name', globalModel); 
-            if (fileInput.files[0]) formData.append('file', fileInput.files[0]); else formData.append('text_data', textInput);
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/extract`, { method: 'POST', body: formData });
-                if (!response.ok) throw new Error("AI Extraction failed");
-                globalExtractedData = await response.json();
-                
-                const tbody = document.getElementById('preview-table-body'); tbody.innerHTML = '';
-                globalExtractedData.forEach(item => {
-                    tbody.insertAdjacentHTML('beforeend', `<tr class="hover:bg-slate-50"><td class="px-3 py-2 text-slate-500 whitespace-nowrap">${item.date || '-'}</td><td class="px-3 py-2 font-medium text-slate-800">${item.item_name}</td><td class="px-3 py-2">${item.quantity}</td><td class="px-3 py-2">${item.unit_price}</td><td class="px-3 py-2 font-semibold text-slate-700">${item.total}</td></tr>`);
-                });
-                document.getElementById('transaction-form').classList.add('hidden'); document.getElementById('preview-section').classList.remove('hidden');
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-            } finally {
-                extractBtn.disabled = false; extractBtn.classList.remove('opacity-50', 'cursor-not-allowed'); extractText.innerText = "Extract Data with AI";
-            }
+            document.getElementById('stock-table').innerHTML = Object.entries(data.stock).map(([item, qty]) => `
+                <tr><td class="p-4 font-semibold">${item}</td><td class="p-4 text-right font-mono">${qty} units</td></tr>
+            `).join('');
         }
 
-        // --- Save to Database Logic (Fixed Auto-Update!) ---
-        async function confirmAndSave() {
-            const saveBtn = document.getElementById('save-btn'); 
-            saveBtn.disabled = true; 
-            saveBtn.innerText = "💾 Saving...";
-            
-            try {
-                // 1. Send the data to the Python Brain
-                const response = await fetch(`${API_BASE_URL}/api/save`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ mode: 'stock', items: globalExtractedData }) 
-                });
-                
-                if (!response.ok) throw new Error("Database save failed");
-                
-                // 2. FORCE the dashboard to fetch the new data and wait until it finishes
-                await fetchDashboardData(); 
-                
-                // 3. ONLY close the modal and alert the user after the background is updated
-                closeTransactionModal(); 
-                setTimeout(() => {
-                    alert("✅ Success! The data has been saved and the dashboard is updated.");
-                }, 100);
-
-            } catch (error) { 
-                alert("❌ Error: " + error.message); 
-            } finally { 
-                saveBtn.disabled = false; 
-                saveBtn.innerText = "Confirm & Save to Database"; 
-            }
+        async function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + id).classList.add('active');
+            if(id === 'forecast') loadForecast();
+            if(id === 'smart') loadSmartOrders();
         }
 
-        // --- THE FIX: PARALLEL FETCHING WITH PROMISE.ALL ---
-        async function fetchDashboardData() {
-            try {
-                document.getElementById('stock-loading').innerText = "Loading data...";
-                document.getElementById('ledger-loading').innerText = "Loading data...";
-
-                // Fire all 3 requests to Render at the EXACT SAME TIME
-                const [metricsRes, stockRes, ledgerRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/metrics`),
-                    fetch(`${API_BASE_URL}/api/stock`),
-                    fetch(`${API_BASE_URL}/api/transactions`)
-                ]);
-
-                // Wait for all 3 to convert to JSON
-                const metrics = await metricsRes.json();
-                const stockData = await stockRes.json();
-                const ledgerData = await ledgerRes.json();
-
-                // 1. Update Metrics UI
-                const formatR = (num) => num.toLocaleString('en-IN');
-                document.getElementById('total-investment').innerText = `₹${formatR(metrics.investment)}`;
-                document.getElementById('total-revenue').innerText = `₹${formatR(metrics.revenue)}`;
-                document.getElementById('current-balance').innerText = `${metrics.balance >= 0 ? '+ ₹' : '- ₹'}${formatR(Math.abs(metrics.balance))}`;
-                document.getElementById('pending-udhari').innerText = `₹${formatR(metrics.udhari)}`;
-
-                // 2. Update Stock UI
-                const stockBody = document.getElementById('inventory-table-body');
-                stockBody.innerHTML = ''; 
-                stockData.forEach(item => {
-                    let badge = item.Status === 'Healthy' ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Healthy</span>` :
-                                item.Status === 'Reorder Soon' ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Reorder Soon</span>` :
-                                `<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Low Stock</span>`;
-                    
-                    stockBody.insertAdjacentHTML('beforeend', `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="px-6 py-4 font-medium text-slate-900">${item.item_name}</td>
-                            <td class="px-6 py-4 text-slate-500">${item.category}</td>
-                            <td class="px-6 py-4 font-semibold ${item.Remaining_Stock <= 5 ? 'text-red-600' : ''}">${item.Remaining_Stock} units</td>
-                            <td class="px-6 py-4">${badge}</td>
-                        </tr>
-                    `);
-                });
-
-                // 3. Update Ledger UI
-                const ledgerBody = document.getElementById('ledger-table-body');
-                ledgerBody.innerHTML = '';
-                if (ledgerData.length === 0) {
-                    ledgerBody.innerHTML = `<tr><td colspan="7" class="px-6 py-4 text-center text-slate-500 italic">No recent transactions found. Add one above!</td></tr>`;
-                } else {
-                    ledgerData.forEach(tx => {
-                        const row = `
-                            <tr class="hover:bg-slate-50 transition-colors">
-                                <td class="px-6 py-3 whitespace-nowrap text-slate-500">${tx.date}</td>
-                                <td class="px-6 py-3 font-medium text-slate-900">${tx.item_name}</td>
-                                <td class="px-6 py-3 text-slate-500">${tx.category}</td>
-                                <td class="px-6 py-3 font-semibold">${tx.quantity}</td>
-                                <td class="px-6 py-3 text-slate-600">₹${tx.unit_price}</td>
-                                <td class="px-6 py-3 font-bold text-slate-800">₹${tx.total}</td>
-                                <td class="px-6 py-3"><span class="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">${tx.payment_mode}</span></td>
-                            </tr>
-                        `;
-                        ledgerBody.insertAdjacentHTML('beforeend', row);
-                    });
-                }
-            } catch (e) {
-                console.error("Dashboard Fetch Error:", e);
-                document.getElementById('stock-loading').innerText = "⚠️ Failed to load data.";
-                document.getElementById('ledger-loading').innerText = "⚠️ Failed to load data.";
-            }
+        async function loadForecast() {
+            const res = await fetch(`${API_BASE_URL}/api/forecast`);
+            const data = await res.json();
+            document.getElementById('forecast-grid').innerHTML = data.map(f => `
+                <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                    <p class="text-lg font-bold">${f.item_name}</p>
+                    <div class="mt-4 flex justify-between text-xs"><span class="text-slate-400">Predicted Demand</span><span class="font-bold">${f.demand_7d}</span></div>
+                    <div class="mt-4 text-center"><p class="text-[10px] text-slate-400 uppercase">Suggested Order</p><p class="text-3xl font-black ${f.suggested_order > 0 ? 'text-indigo-600' : 'text-slate-200'}">${f.suggested_order}</p></div>
+                </div>
+            `).join('');
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchDashboardData();
-            checkSystemReady();
-        });
+        async function loadSmartOrders() {
+            const res = await fetch(`${API_BASE_URL}/api/smart-order`);
+            const data = await res.json();
+            const list = document.getElementById('order-list');
+            if(data.length === 0) { list.innerHTML = `<div class="p-10 text-center text-slate-400">No pending orders. Stock is healthy!</div>`; return; }
+            list.innerHTML = data.map(o => `
+                <div class="bg-white p-6 rounded-3xl border border-slate-100 flex items-center justify-between">
+                    <div><p class="font-bold text-lg">${o.qty}x ${o.item}</p><p class="text-xs text-slate-400">Supplier: ${o.supplier} | Rate: ₹${o.price}</p></div>
+                    <button onclick="window.open('https://wa.me/${o.contact}?text=Order:%20${o.qty}%20${o.item}')" class="bg-emerald-500 text-white px-6 py-2 rounded-full font-bold text-xs hover:bg-emerald-600 transition">Order via WA</button>
+                </div>
+            `).join('');
+        }
+
+        async function runSimulation() {
+            if(!confirm("Inject 30 days of sample data?")) return;
+            await fetch(`${API_BASE_URL}/api/simulate`, {method: 'POST'});
+            alert("Simulation complete! Data is now in your cloud database.");
+            refreshData();
+        }
+
+        async function resetAll() {
+            if(!confirm("DELETE ALL CLOUD DATA?")) return;
+            await fetch(`${API_BASE_URL}/api/reset`, {method: 'POST'});
+            refreshData();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { refreshData(); });
     </script>
 </body>
 </html>
