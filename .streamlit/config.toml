@@ -1,0 +1,19 @@
+[theme]
+# The main accent color (used for your primary buttons, sliders, and loading bars)
+primaryColor = "#4F46E5"
+
+# The main app background (A sleek, deep slate dark mode)
+backgroundColor = "#0F172A"
+
+# The sidebar and widget background (Slightly lighter slate to create visual depth)
+secondaryBackgroundColor = "#1E293B"
+
+# The text color (Crisp off-white for high contrast and readability)
+textColor = "#F8FAFC"
+
+# A clean, modern sans-serif font
+font = "sans serif"
+
+[client]
+# Hides the default Streamlit toolbar menu at the top right for a cleaner app feel
+toolbarMode = "minimal"
