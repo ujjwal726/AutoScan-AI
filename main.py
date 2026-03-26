@@ -9,9 +9,7 @@ from typing import Optional, List
 
 # AI Providers
 import google.generativeai as genai
-from openai import OpenAI
 from groq import Groq
-import anthropic
 from PIL import Image
 
 # --- 1. INITIALIZATION & DATABASE ---
