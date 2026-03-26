@@ -6,3 +6,5 @@ openai
 groq
 openpyxl
 anthropic
+fastapi
+uvicorn
