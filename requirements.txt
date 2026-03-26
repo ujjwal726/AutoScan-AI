@@ -1,10 +1,9 @@
-streamlit
-google-generativeai
-pandas
-pillow
-openai
-groq
-openpyxl
-anthropic
 fastapi
 uvicorn
+pandas
+python-multipart
+google-generativeai
+openai
+groq
+anthropic
+pillow
