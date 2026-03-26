@@ -44,7 +44,7 @@
             <h1 class="text-2xl font-semibold text-slate-800">Inventory Overview</h1>
             <div class="flex items-center space-x-4">
                 <span class="text-sm font-medium text-slate-500">Last synced: Just now</span>
-                <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm shadow-brand-500/30 transition-all transform hover:-translate-y-0.5">
+                <button onclick="openModal()" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm shadow-brand-500/30 transition-all transform hover:-translate-y-0.5">
                     + Add Transaction
                 </button>
             </div>
@@ -99,18 +99,147 @@
             </div>
 
         </div>
-    </main>
-    <script>
-        // 🚨 IMPORTANT: Replace this with your actual Render URL when it finishes building!
-        const API_BASE_URL = "https://https://autoscan-ai-psz1.onrender.com"; 
 
+        <div id="transaction-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform scale-95 transition-all duration-300" id="modal-content">
+                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="text-lg font-semibold text-slate-800">Add New Transaction</h3>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <form id="transaction-form" class="space-y-5">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Upload Bill/Receipt (Image or PDF)</label>
+                            <input type="file" id="receipt-file" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 transition-colors cursor-pointer" accept="image/*,.pdf">
+                        </div>
+                        
+                        <div class="relative flex items-center py-2">
+                            <div class="flex-grow border-t border-slate-200"></div>
+                            <span class="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase font-medium tracking-wider">OR</span>
+                            <div class="flex-grow border-t border-slate-200"></div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Manual Text Entry</label>
+                            <textarea id="manual-entry" rows="3" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-shadow" placeholder="e.g., Bought 50kg Sugar at 40/kg..."></textarea>
+                        </div>
+
+                        <div class="pt-2">
+                            <button type="button" onclick="submitTransaction()" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-2.5 rounded-lg transition-all shadow-sm transform hover:-translate-y-0.5 flex justify-center items-center">
+                                <span id="submit-text">Extract & Save Data</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // FIXED: Removed the double https:// 
+        const API_BASE_URL = "https://autoscan-ai-psz1.onrender.com"; 
+
+        // Modal Control Functions
+        const modal = document.getElementById('transaction-modal');
+        const modalContent = document.getElementById('modal-content');
+
+        function openModal() {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.getElementById('transaction-form').reset();
+            }, 300);
+        }
+
+        // The Brain Connection: Submitting Data to FastAPI
+        async function submitTransaction() {
+            const fileInput = document.getElementById('receipt-file');
+            const textInput = document.getElementById('manual-entry').value;
+            const submitText = document.getElementById('submit-text');
+            const submitBtn = submitText.parentElement;
+
+            if (!fileInput.files[0] && !textInput.trim()) {
+                alert("⚠️ Please upload a bill or type some text first.");
+                return;
+            }
+
+            const apiKey = prompt("🔐 To process this, please enter your Google Gemini API Key:");
+            if (!apiKey) return; 
+
+            submitBtn.disabled = true;
+            submitBtn.classList.add("opacity-75", "cursor-not-allowed");
+            submitText.innerText = "🧠 AI is reading the bill...";
+            
+            const formData = new FormData();
+            formData.append('mode', 'stock'); 
+            formData.append('provider', 'Google Gemini');
+            formData.append('api_key', apiKey);
+            formData.append('model_name', 'gemini-1.5-flash'); 
+
+            if (fileInput.files[0]) {
+                formData.append('file', fileInput.files[0]);
+            } else {
+                formData.append('text_data', textInput);
+            }
+
+            try {
+                const extractResponse = await fetch(`${API_BASE_URL}/api/extract`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!extractResponse.ok) {
+                    const err = await extractResponse.json();
+                    throw new Error(err.detail || "AI Extraction failed");
+                }
+
+                const extractedItems = await extractResponse.json();
+                
+                submitText.innerText = "💾 Saving to Database...";
+                const saveResponse = await fetch(`${API_BASE_URL}/api/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mode: 'stock',
+                        items: extractedItems
+                    })
+                });
+
+                if (!saveResponse.ok) throw new Error("Database save failed");
+
+                alert("✅ Success! The items have been added to your inventory.");
+                closeModal();
+                fetchDashboardData(); // Refresh the screen automatically!
+
+            } catch (error) {
+                alert("❌ Error: " + error.message);
+                console.error(error);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove("opacity-75", "cursor-not-allowed");
+                submitText.innerText = "Extract & Save Data";
+            }
+        }
+
+        // The Dashboard Display Logic
         async function fetchDashboardData() {
             try {
-                // 1. Fetch and Update Financial Metrics
                 const metricsResponse = await fetch(`${API_BASE_URL}/api/metrics`);
                 const metrics = await metricsResponse.json();
 
-                // Format numbers to Indian Rupee style (e.g., 45,200)
                 const formatRupee = (num) => num.toLocaleString('en-IN');
 
                 document.getElementById('total-investment').innerText = `₹${formatRupee(metrics.investment)}`;
@@ -120,12 +249,11 @@
                 document.getElementById('current-balance').innerText = `${balancePrefix}${formatRupee(Math.abs(metrics.balance))}`;
                 document.getElementById('pending-udhari').innerText = `₹${formatRupee(metrics.udhari)}`;
 
-                // 2. Fetch and Update Inventory Table
                 const stockResponse = await fetch(`${API_BASE_URL}/api/stock`);
                 const stockData = await stockResponse.json();
 
                 const tbody = document.getElementById('inventory-table-body');
-                tbody.innerHTML = ''; // Clear out the hardcoded fake data
+                tbody.innerHTML = ''; 
 
                 stockData.forEach(item => {
                     let statusBadge = '';
@@ -137,7 +265,6 @@
                         statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Low Stock</span>`;
                     }
 
-                    // Highlight low stock numbers in red
                     const stockClass = item.Remaining_Stock <= 5 ? 'text-red-600' : '';
 
                     const row = `
@@ -157,7 +284,6 @@
             }
         }
 
-        // Trigger the fetch as soon as the webpage loads
         document.addEventListener('DOMContentLoaded', fetchDashboardData);
     </script>
 </body>
