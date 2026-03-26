@@ -5,3 +5,5 @@ python-multipart
 google-generativeai
 groq
 pillow
+psycopg2-binary
+sqlalchemy
